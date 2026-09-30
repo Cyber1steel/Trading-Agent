@@ -12,6 +12,7 @@ venv/
 build/
 dist/
 data/raw/**
+!data/raw/sample_trading_notes.txt
 data/processed/**
 data/datasets/**
 !data/raw/.gitkeep

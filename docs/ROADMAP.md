@@ -1,7 +1,9 @@
 # Roadmap
 
 - [x] Phase 1 — Foundation
-- [ ] Phase 2 — Knowledge ingestion and RAG
+- [x] Phase 2A — Knowledge ingestion foundation
+- [ ] Phase 2B — Embeddings + vector search
+- [ ] Phase 2C — Web/YouTube/podcast ingestion
 - [ ] Phase 3 — Market data
 - [ ] Phase 4 — Market/technical analysis
 - [ ] Phase 5 — Risk engine
