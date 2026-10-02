@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:0.8.6-pg16-bookworm
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-trading_agent}
       POSTGRES_USER: ${POSTGRES_USER:-trading_agent}

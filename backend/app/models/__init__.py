@@ -1,1 +1,5 @@
-"""SQLAlchemy model package; no application tables are defined yet."""
+"""SQLAlchemy persistence models."""
+
+from app.models.embedding import EmbeddingSpace, KnowledgeEmbedding
+
+__all__ = ["EmbeddingSpace", "KnowledgeEmbedding"]
