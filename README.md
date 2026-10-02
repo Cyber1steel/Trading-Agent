@@ -4,7 +4,7 @@ This repository is the foundation of an AI trading research platform. It provide
 
 ## Development stage
 
-Phase 1, Phase 2A (local knowledge ingestion), and Phase 2B (local embeddings and semantic retrieval) are implemented. Market analysis and trading capabilities are not implemented.
+Phase 1, Phase 2A (local knowledge ingestion), Phase 2B (embeddings and semantic retrieval), and Phase 2C (lexical/hybrid retrieval and evaluation) are implemented. Market analysis and trading capabilities are not implemented.
 
 ## Technology stack
 
@@ -63,7 +63,27 @@ After Phase 2A has produced JSON files, embed them explicitly:
 python scripts/embed_documents.py data/processed
 ```
 
-The command is rerunnable: unchanged chunk text is skipped, changed text is re-embedded, and provenance points to the Phase 2A JSON source of truth. `EmbeddingIngestionService` and `SemanticRetrievalService` are application services; they are not exposed as public HTTP routes in this phase. Retrieval returns structured chunks with cosine distance and source metadata. It currently uses exact cosine search, with filters for source/document ID, source type, path, and page. There is no keyword/hybrid search or evidence synthesis yet.
+The command is rerunnable: unchanged chunk text is skipped, changed text is re-embedded, and provenance points to the Phase 2A JSON source of truth. After applying the Phase 2C migration, backfill lexical vectors for existing embeddings from canonical JSON without loading the model:
+
+```powershell
+python scripts/index_lexical_documents.py data/processed
+```
+
+Semantic and lexical services are independently callable; `HybridRetrievalService` combines their bounded candidate lists using Reciprocal Rank Fusion (RRF). Candidate counts default to 20 per mode and `HYBRID_RRF_K` defaults to 60. Filters are applied by both search queries before their candidate limits. Results keep the shared structured provenance contract, score/rank evidence, and cosine distance when available. These services are not public HTTP routes.
+
+Lexical search uses PostgreSQL's English full-text query/rank functions and a GIN-indexed derived `tsvector`. It searches chunks already registered by Phase 2B; the lexical backfill script indexes canonical Phase 2A JSON for existing rows without requiring model weights.
+
+### Phase 2C validation status
+
+PostgreSQL with pgvector is the intended persistence and retrieval backend for Phase 2C. The implementation has been checked with unit tests and static/offline checks. Live PostgreSQL/pgvector migration and retrieval execution have **not** been verified locally in the current Windows environment: a usable PostgreSQL test database is not configured/available, and the local psycopg binary is restricted by Windows Application Control. SQLite can support unrelated local checks, but it does not validate PostgreSQL-specific `TSVECTOR`, GIN, or pgvector behavior. The gated PostgreSQL integration tests remain available and should be run against a working PostgreSQL + pgvector test database. Live validation is pending; this environment limitation does not by itself indicate an implementation failure.
+
+Compare all retrieval modes on the versioned bootstrap dataset after the model and database are ready:
+
+```powershell
+python scripts/evaluate_retrieval.py
+```
+
+The report provides per-query failure details and Recall@K, Precision@K, Hit Rate@K, and MRR@K. The initial dataset is a small check against the fictional sample note, not a representative quality benchmark. Hybrid retrieval is not reranking or RAG, and retrieval quality does not establish trading profitability.
 
 ## Run with Docker Compose
 

@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     embedding_batch_size: int = Field(default=32, gt=0)
     embedding_cache_dir: Path = Path(".cache/fastembed")
     embedding_local_files_only: bool = True
+    hybrid_semantic_candidates: int = Field(default=20, gt=0)
+    hybrid_lexical_candidates: int = Field(default=20, gt=0)
+    hybrid_rrf_k: int = Field(default=60, gt=0)
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[2] / ".env",

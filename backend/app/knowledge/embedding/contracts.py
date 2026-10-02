@@ -28,6 +28,12 @@ class EmbeddingIngestionReport(BaseModel):
     embeddings_skipped: int
 
 
+class LexicalIndexingReport(BaseModel):
+    processed_file_paths: list[str]
+    chunks_seen: int
+    database_rows_updated: int
+
+
 class RetrievalFilters(BaseModel):
     """Small, explicit metadata filter set for semantic retrieval."""
 
@@ -68,6 +74,24 @@ class StoredEmbeddingHit(BaseModel):
     distance: float
 
 
+class StoredLexicalHit(BaseModel):
+    chunk_id: str
+    source_id: str
+    source_type: SourceType
+    title: str
+    author: str | None
+    source_url: str | None
+    source_file_path: str
+    processed_file_path: str
+    published_at: datetime | None
+    page_number: int | None
+    chunk_index: int
+    char_start: int | None
+    char_end: int | None
+    content_sha256: str
+    lexical_score: float
+
+
 class RetrievalResult(BaseModel):
     """A source-resolved chunk and its cosine distance; distance is not probability."""
 
@@ -84,10 +108,15 @@ class RetrievalResult(BaseModel):
     char_start: int | None
     char_end: int | None
     text: str
-    distance: float = Field(ge=0, le=2)
-    embedding_provider: str
-    embedding_model: str
-    embedding_dimension: int = Field(gt=0)
+    distance: float | None = Field(default=None, ge=0, le=2)
+    embedding_provider: str | None = None
+    embedding_model: str | None = None
+    embedding_dimension: int | None = Field(default=None, gt=0)
     processed_file_path: str
     ingestion_chunk_size: int = Field(gt=0)
     ingestion_overlap: int = Field(ge=0)
+    retrieval_mode: Literal["semantic", "lexical", "hybrid"] = "semantic"
+    lexical_score: float | None = None
+    semantic_rank: int | None = Field(default=None, gt=0)
+    lexical_rank: int | None = Field(default=None, gt=0)
+    hybrid_score: float | None = None

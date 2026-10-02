@@ -6,7 +6,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, delete
+from sqlalchemy import create_engine, delete, update
 from sqlalchemy.orm import sessionmaker
 
 from app.knowledge.embedding.contracts import ChunkForEmbedding, RetrievalFilters
@@ -15,6 +15,7 @@ from app.knowledge.embedding.errors import (
     SourceChunkUnavailable,
     StaleEmbeddingError,
 )
+from app.knowledge.embedding.lexical import LexicalRetrievalService
 from app.knowledge.embedding.repository import EmbeddingRepository
 from app.knowledge.embedding.retrieval import SemanticRetrievalService
 from app.knowledge.models import DocumentChunk, ProcessedDocument, SourceMetadata
@@ -47,6 +48,13 @@ def test_pgvector_persistence_idempotency_similarity_and_filters(tmp_path: Path)
     try:
         assert repository.upsert_batch(records, "integration", model, 2) == (2, 0, 0)
         assert repository.upsert_batch(records, "integration", model, 2) == (0, 0, 2)
+        with factory() as session, session.begin():
+            session.execute(
+                update(KnowledgeEmbedding)
+                .where(KnowledgeEmbedding.chunk_id == records[0].chunk.chunk_id)
+                .values(search_vector=None)
+            )
+        assert repository.refresh_lexical_vectors([records[0]]) >= 1
 
         class QueryProvider:
             provider_name, model_name, dimension = "integration", model, 2
@@ -55,6 +63,18 @@ def test_pgvector_persistence_idempotency_similarity_and_filters(tmp_path: Path)
         assert len(hits) == 1
         assert hits[0].chunk_id == records[0].chunk.chunk_id
         assert hits[0].distance == pytest.approx(0.0, abs=1e-6)
+
+        lexical_hits = repository.search_lexical(
+            "closest", 1, RetrievalFilters(source_id=source.source_id)
+        )
+        assert len(lexical_hits) == 1
+        assert lexical_hits[0].chunk_id == records[0].chunk.chunk_id
+        assert lexical_hits[0].lexical_score > 0
+        lexical_result = LexicalRetrievalService(repository).search(
+            "closest", 1, RetrievalFilters(source_id=source.source_id)
+        )
+        assert lexical_result[0].text == "closest"
+        assert lexical_result[0].source_id == source.source_id
 
         class QueryProvider:
             provider_name, model_name, dimension = "integration", model, 2

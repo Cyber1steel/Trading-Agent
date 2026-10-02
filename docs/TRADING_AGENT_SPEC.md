@@ -1,7 +1,7 @@
 # Trading-Agent Master Engineering Specification
 
 **Status:** Master requirements for future development  
-**Current implementation:** Foundation and Phase 2A knowledge ingestion only
+**Current implementation:** Foundation, Phase 2A ingestion, Phase 2B embeddings/semantic retrieval, and Phase 2C lexical/hybrid retrieval/evaluation
 
 This document is the technical contract for future Trading-Agent work. New designs, implementation prompts, and phase proposals must follow these requirements or explicitly document a justified change to this specification. Requirements for future components describe intended behavior; they do not imply those components exist today.
 
@@ -62,7 +62,7 @@ The architecture is a set of conceptual components, not a mandate to create a mi
 
 1. **Knowledge ingestion** accepts supported source material and captures source metadata.
 2. **Knowledge processing** extracts, cleans, structures, and chunks content while preserving attribution and any available page or timestamp references.
-3. **Embeddings and semantic retrieval** may later index processed knowledge. Retrieval should pass source-linked evidence to analysis or agent orchestration; it must not turn retrieved claims into verified facts automatically.
+3. **Embeddings and retrieval** index processed knowledge with source-linked semantic, lexical, and hybrid search. Retrieval passes evidence to future analysis or agent orchestration; it must not turn retrieved claims into verified facts automatically.
 4. **Market data ingestion** obtains historical and, in a later phase, real-time data from identified providers.
 5. **Market data validation** checks completeness, chronology, consistency, units, and provenance before data is made available to analysis, strategies, or simulation.
 6. **Market analysis** computes descriptive features such as trend, structure, volatility, and session behavior from validated data.
@@ -97,7 +97,7 @@ The knowledge system must distinguish:
 
 Source quality should eventually consider whether material is a primary source, research, education, personal opinion, influencer content, anecdote, or empirical evidence. Popularity, repetition in retrieved results, and confident presentation do not establish reliability. Retrieval should prioritize relevance, provenance, and source quality rather than maximizing the number of returned chunks. Conflicting sources should remain visible for evaluation.
 
-Embeddings, vector databases, and retrieval are future capabilities and are not authorized by this specification alone; they require their own implementation phase.
+Embeddings, vector storage, and retrieval are implemented through the separately scoped Phase 2B and Phase 2C work. Retrieved relevance, repetition, and popularity do not establish source quality or factual validity.
 
 ## 5. Market data requirements
 
@@ -251,6 +251,6 @@ Success is not “the AI predicts the market correctly.” No architecture can g
 
 ## 22. Current implementation boundary
 
-The current project contains the FastAPI/PostgreSQL foundation and Phase 2A local knowledge ingestion for TXT, Markdown, and text-based PDF documents. Those capabilities do not establish predictive value or trading performance.
+The current project contains the FastAPI/PostgreSQL foundation, Phase 2A local knowledge ingestion for TXT, Markdown, and text-based PDF documents, and Phase 2B/2C source-linked retrieval. Those capabilities do not establish predictive value or trading performance.
 
-This specification does not implement or authorize embeddings, vector search, retrieval, market APIs, indicators, strategy rules, a risk engine, backtesting, ML models, broker APIs, trading execution, a frontend, or authentication. Future work must be proposed and validated as a separate phase. Phase 2B and all later phases remain unimplemented until separately requested.
+The current project includes Phase 1 foundations, Phase 2A local ingestion, Phase 2B local embeddings and semantic retrieval, and Phase 2C PostgreSQL lexical/hybrid retrieval with a bootstrap evaluation harness. It does not implement market APIs, indicators, strategy rules, a risk engine, backtesting, ML models, broker APIs, trading execution, a frontend, or authentication. Those remain future work subject to their own scope and validation.

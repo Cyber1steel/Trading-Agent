@@ -1,19 +1,26 @@
 from collections.abc import Callable, Sequence
 
-from sqlalchemy import Select, func, select, update
+from sqlalchemy import Select, bindparam, func, literal_column, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
 from app.embeddings.base import EmbeddingProvider
-from app.knowledge.embedding.contracts import ChunkForEmbedding, RetrievalFilters, StoredEmbeddingHit
+from app.knowledge.embedding.contracts import (
+    ChunkForEmbedding,
+    RetrievalFilters,
+    StoredEmbeddingHit,
+    StoredLexicalHit,
+)
 from app.knowledge.embedding.errors import (
     DatabaseUnavailable,
     IncompatibleEmbeddingDimension,
     VectorExtensionUnavailable,
 )
 from app.models.embedding import EmbeddingSpace, KnowledgeEmbedding
+
+_ENGLISH_TEXT_CONFIG = literal_column("'english'::regconfig")
 
 
 class EmbeddingRepository:
@@ -113,6 +120,7 @@ class EmbeddingRepository:
             "char_end": chunk.char_end,
             "content_sha256": record.content_sha256,
             "embedding": record.vector,
+            "search_vector": func.to_tsvector(_ENGLISH_TEXT_CONFIG, chunk.text),
             "embedding_provider": provider,
             "embedding_model": model,
             "embedding_dimension": dimension,
@@ -161,6 +169,7 @@ class EmbeddingRepository:
                             "char_end": excluded.char_end,
                             "content_sha256": excluded.content_sha256,
                             "embedding": excluded.embedding,
+                            "search_vector": excluded.search_vector,
                             "embedding_dimension": excluded.embedding_dimension,
                             "created_at": func.now(),
                         },
@@ -216,10 +225,46 @@ class EmbeddingRepository:
                             chunk_index=chunk.chunk_index,
                             char_start=chunk.char_start,
                             char_end=chunk.char_end,
+                            search_vector=func.to_tsvector(_ENGLISH_TEXT_CONFIG, chunk.text),
                         )
                     )
         except (IncompatibleEmbeddingDimension, VectorExtensionUnavailable, DatabaseUnavailable):
             raise
+        except SQLAlchemyError as exc:
+            self._raise_database_error(exc)
+
+    def refresh_lexical_vectors(self, records: Sequence[ChunkForEmbedding]) -> int:
+        """Backfill derived tsvectors without loading or changing embedding vectors."""
+        if not records:
+            return 0
+        statement = (
+            update(KnowledgeEmbedding)
+            .where(
+                KnowledgeEmbedding.chunk_id == bindparam("target_chunk_id"),
+                KnowledgeEmbedding.source_id == bindparam("target_source_id"),
+                KnowledgeEmbedding.content_sha256 == bindparam("target_content_sha256"),
+            )
+            .values(
+                search_vector=func.to_tsvector(
+                    _ENGLISH_TEXT_CONFIG, bindparam("canonical_chunk_text")
+                )
+            )
+        )
+        parameters = [
+            {
+                "target_chunk_id": record.chunk.chunk_id,
+                "target_source_id": record.source.source_id,
+                "target_content_sha256": record.content_sha256,
+                "canonical_chunk_text": record.chunk.text,
+            }
+            for record in records
+        ]
+        try:
+            with self._session_factory() as session, session.begin():
+                # Core execution keeps SQLAlchemy's ORM bulk-update-by-primary-key
+                # behavior out of this natural-key batch update.
+                result = session.connection().execute(statement, parameters)
+                return max(result.rowcount or 0, 0)
         except SQLAlchemyError as exc:
             self._raise_database_error(exc)
 
@@ -254,7 +299,7 @@ class EmbeddingRepository:
                         KnowledgeEmbedding.embedding_model == provider.model_name,
                         KnowledgeEmbedding.embedding_dimension == provider.dimension,
                     )
-                    .order_by(distance)
+                    .order_by(distance, KnowledgeEmbedding.chunk_id.asc())
                     .limit(top_k)
                 )
                 if filters is not None:
@@ -282,6 +327,70 @@ class EmbeddingRepository:
                 ]
         except IncompatibleEmbeddingDimension:
             raise
+        except SQLAlchemyError as exc:
+            self._raise_database_error(exc)
+
+    def search_lexical(
+        self,
+        query_text: str,
+        top_k: int,
+        filters: RetrievalFilters | None = None,
+    ) -> list[StoredLexicalHit]:
+        """Search derived tsvectors with PostgreSQL web-style full-text syntax."""
+        if not query_text or not query_text.strip() or top_k <= 0:
+            return []
+        try:
+            with self._session_factory() as session:
+                tsquery = func.websearch_to_tsquery(_ENGLISH_TEXT_CONFIG, query_text.strip())
+                rank = func.ts_rank_cd(KnowledgeEmbedding.search_vector, tsquery).label("lexical_score")
+                candidate_rows = select(
+                    KnowledgeEmbedding.id.label("embedding_id"),
+                    rank.label("lexical_score"),
+                    func.row_number().over(
+                        partition_by=KnowledgeEmbedding.chunk_id,
+                        order_by=(
+                            KnowledgeEmbedding.embedding_provider.asc(),
+                            KnowledgeEmbedding.embedding_model.asc(),
+                            KnowledgeEmbedding.id.asc(),
+                        ),
+                    ).label("model_choice"),
+                ).where(
+                    KnowledgeEmbedding.search_vector.is_not(None),
+                    KnowledgeEmbedding.search_vector.op("@@")(tsquery),
+                )
+                if filters is not None:
+                    candidate_rows = self._apply_filters(candidate_rows, filters)
+                candidates = candidate_rows.subquery()
+                statement: Select = (
+                    select(KnowledgeEmbedding, candidates.c.lexical_score)
+                    .join(candidates, KnowledgeEmbedding.id == candidates.c.embedding_id)
+                    .where(
+                        candidates.c.model_choice == 1,
+                    )
+                    .order_by(candidates.c.lexical_score.desc(), KnowledgeEmbedding.chunk_id.asc())
+                    .limit(top_k)
+                )
+                rows = session.execute(statement).all()
+                return [
+                    StoredLexicalHit(
+                        chunk_id=row.chunk_id,
+                        source_id=row.source_id,
+                        source_type=row.source_type,
+                        title=row.title,
+                        author=row.author,
+                        source_url=row.source_url,
+                        source_file_path=row.source_file_path,
+                        processed_file_path=row.processed_file_path,
+                        published_at=row.published_at,
+                        page_number=row.page_number,
+                        chunk_index=row.chunk_index,
+                        char_start=row.char_start,
+                        char_end=row.char_end,
+                        content_sha256=row.content_sha256,
+                        lexical_score=float(score),
+                    )
+                    for row, score in rows
+                ]
         except SQLAlchemyError as exc:
             self._raise_database_error(exc)
 

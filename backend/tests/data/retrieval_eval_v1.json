@@ -1,0 +1,27 @@
+{
+  "dataset_id": "sample-trading-notes-bootstrap",
+  "version": 1,
+  "cases": [
+    {
+      "case_id": "pause-after-move",
+      "query": "What happened after the quick price move?",
+      "expected_source_paths": ["data/raw/sample_trading_notes.txt"],
+      "expected_chunk_indices": [0],
+      "notes": "Targets the sample note's observation that price paused after a quick move."
+    },
+    {
+      "case_id": "quiet-volume-causality",
+      "query": "Does quieter volume explain why price paused?",
+      "expected_source_paths": ["data/raw/sample_trading_notes.txt"],
+      "expected_chunk_indices": [0],
+      "notes": "The note explicitly says the observation alone does not explain the pause."
+    },
+    {
+      "case_id": "not-a-trading-instruction",
+      "query": "Is this note a strategy or trade instruction?",
+      "expected_source_paths": ["data/raw/sample_trading_notes.txt"],
+      "expected_chunk_indices": [0],
+      "notes": "Targets the note's explicit statement that it is neither."
+    }
+  ]
+}

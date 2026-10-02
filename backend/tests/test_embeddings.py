@@ -118,6 +118,7 @@ def test_retrieval_empty_query_top_k_filters_and_provenance(tmp_path):
     result = service.search("market setup", top_k=1, filters=filters)[0]
     assert result.text == chunk.text and result.document_id == "source-1"
     assert result.distance == 0.12 and result.page_number is None
+    assert result.retrieval_mode == "semantic" and result.semantic_rank == 1
     assert repo.search_args[1:] == (1, filters)
     assert provider.calls[-1] == ("market setup", "query")
 

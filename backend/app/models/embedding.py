@@ -16,6 +16,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import TSVECTOR
 
 from app.core.database import Base
 
@@ -77,6 +78,11 @@ class KnowledgeEmbedding(Base):
         Index("ix_knowledge_embeddings_source_type", "source_type"),
         Index("ix_knowledge_embeddings_document", "source_file_path"),
         Index("ix_knowledge_embeddings_page", "page_number"),
+        Index(
+            "ix_knowledge_embeddings_search_vector",
+            "search_vector",
+            postgresql_using="gin",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
@@ -95,6 +101,8 @@ class KnowledgeEmbedding(Base):
     char_end: Mapped[int | None] = mapped_column(Integer)
     content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     embedding: Mapped[Any] = mapped_column(VECTOR(), nullable=False)
+    # Derived lexical index only; the canonical chunk text remains in Phase 2A JSON.
+    search_vector: Mapped[Any | None] = mapped_column(TSVECTOR, nullable=True)
     embedding_provider: Mapped[str] = mapped_column(String(64), nullable=False)
     embedding_model: Mapped[str] = mapped_column(String(255), nullable=False)
     embedding_dimension: Mapped[int] = mapped_column(Integer, nullable=False)
