@@ -1,5 +1,7 @@
 # Architecture
 
+The project-wide engineering contract for future architecture and implementation is documented in [TRADING_AGENT_SPEC.md](TRADING_AGENT_SPEC.md).
+
 ## Current foundation
 
 The current system is a small FastAPI service. Its API routes live separately from application configuration and database infrastructure. SQLAlchemy provides a PostgreSQL engine, session factory, and empty declarative metadata for future tables. Alembic is configured to consume that metadata. No application tables or trading behavior exist yet.

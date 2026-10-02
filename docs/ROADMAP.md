@@ -1,5 +1,7 @@
 # Roadmap
 
+The master engineering specification has been established in [TRADING_AGENT_SPEC.md](TRADING_AGENT_SPEC.md). Future phases should follow its evidence, validation, traceability, and safety requirements.
+
 - [x] Phase 1 — Foundation
 - [x] Phase 2A — Knowledge ingestion foundation
 - [ ] Phase 2B — Embeddings + vector search
