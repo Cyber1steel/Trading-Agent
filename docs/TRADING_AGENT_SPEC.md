@@ -1,7 +1,7 @@
 # Trading-Agent Master Engineering Specification
 
 **Status:** Master requirements for future development  
-**Current implementation:** Foundation, Phase 2A ingestion, Phase 2B embeddings/semantic retrieval, and Phase 2C lexical/hybrid retrieval/evaluation
+**Current implementation:** Foundation, Phase 2A ingestion, Phase 2B embeddings/semantic retrieval, Phase 2C lexical/hybrid retrieval/evaluation, and Phase 2D market-data/context foundations
 
 This document is the technical contract for future Trading-Agent work. New designs, implementation prompts, and phase proposals must follow these requirements or explicitly document a justified change to this specification. Requirements for future components describe intended behavior; they do not imply those components exist today.
 
@@ -63,8 +63,8 @@ The architecture is a set of conceptual components, not a mandate to create a mi
 1. **Knowledge ingestion** accepts supported source material and captures source metadata.
 2. **Knowledge processing** extracts, cleans, structures, and chunks content while preserving attribution and any available page or timestamp references.
 3. **Embeddings and retrieval** index processed knowledge with source-linked semantic, lexical, and hybrid search. Retrieval passes evidence to future analysis or agent orchestration; it must not turn retrieved claims into verified facts automatically.
-4. **Market data ingestion** obtains historical and, in a later phase, real-time data from identified providers.
-5. **Market data validation** checks completeness, chronology, consistency, units, and provenance before data is made available to analysis, strategies, or simulation.
+4. **Market data ingestion** obtains historical and, in a later phase, real-time data from identified providers. Phase 2D establishes typed contracts, normalization, quality reporting, and immutable dataset persistence with a local fixture provider.
+5. **Market data validation** checks completeness, chronology, consistency, units, and provenance before data is made available to analysis, strategies, or simulation. Phase 2D does not provide an external market-data source or authoritative market calendar.
 6. **Market analysis** computes descriptive features such as trend, structure, volatility, and session behavior from validated data.
 7. **Market structure analysis** evaluates defined price-structure concepts and retains the rules and input ranges used.
 8. **Strategy engine** evaluates versioned, explicit strategy rules against eligible data.
@@ -113,9 +113,13 @@ Before use by analysis, strategy evaluation, or backtesting, data must be checke
 
 Missing or invalid data must never be silently fabricated or filled. Any permitted normalization or gap treatment must be explicit, justified for the data type, recorded, and tested. Data that fails validation must be rejected, quarantined, or clearly marked unavailable to downstream components. Real-time and historical sources must preserve timestamps that distinguish event time from receipt or processing time.
 
+Phase 2D implements the historical data foundation using typed UTC BAR-OPEN candles, explicit provider metadata, deterministic normalization/quality checks, and immutable PostgreSQL dataset snapshots. Its local fixture provider does not retrieve real markets. Live PostgreSQL validation remains pending in the current Windows environment; SQLite must not be treated as validating PostgreSQL-specific behavior. Session labels are configurable context, not exchange calendars or strategy rules.
+
 ## 6. Market context
 
 Potential context includes economic calendars, central bank events, major macroeconomic releases, relevant earnings, news, sentiment, volatility regimes, sessions, correlations, and broader market conditions. Contextual data must have timestamps and source attribution where applicable, and its availability at the simulated or actual decision time must be known.
+
+Phase 2D provides configurable timezone-aware session definitions and labels, including overlapping sessions and a separate weekend indicator. Without an explicit market calendar, open/closed status is unknown; generic session windows do not assert market holidays or broker trading hours. News, macroeconomic, and other external context ingestion remain unimplemented.
 
 News, sentiment, and other external context must not be assumed to improve profitability. Their incremental value must be testable against an appropriate baseline, with timing and data-availability controls that prevent future information from entering historical decisions.
 
@@ -251,6 +255,6 @@ Success is not “the AI predicts the market correctly.” No architecture can g
 
 ## 22. Current implementation boundary
 
-The current project contains the FastAPI/PostgreSQL foundation, Phase 2A local knowledge ingestion for TXT, Markdown, and text-based PDF documents, and Phase 2B/2C source-linked retrieval. Those capabilities do not establish predictive value or trading performance.
+The current project contains the FastAPI/PostgreSQL foundation, Phase 2A local knowledge ingestion for TXT, Markdown, and text-based PDF documents, Phase 2B/2C source-linked retrieval, and the Phase 2D market-data/context foundation. These capabilities do not establish predictive value or trading performance.
 
-The current project includes Phase 1 foundations, Phase 2A local ingestion, Phase 2B local embeddings and semantic retrieval, and Phase 2C PostgreSQL lexical/hybrid retrieval with a bootstrap evaluation harness. It does not implement market APIs, indicators, strategy rules, a risk engine, backtesting, ML models, broker APIs, trading execution, a frontend, or authentication. Those remain future work subject to their own scope and validation.
+The current project includes Phase 1 foundations, Phase 2A local ingestion, Phase 2B local embeddings and semantic retrieval, Phase 2C PostgreSQL lexical/hybrid retrieval with a bootstrap evaluation harness, and Phase 2D deterministic market-data/context foundations with an in-memory fixture provider. Phase 2D live PostgreSQL validation remains pending; its gated PostgreSQL integration tests require a migrated test database. The project does not implement external market-data providers, market analysis, indicators, strategy rules, signals, a risk engine, backtesting, ML models, broker APIs, trading execution, a frontend, or authentication. Those remain future work subject to their own scope and validation.

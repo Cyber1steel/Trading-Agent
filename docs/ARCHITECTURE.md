@@ -42,12 +42,24 @@ PostgreSQL with pgvector is the intended persistence and retrieval backend for t
 
 Hybrid retrieval is not reranking and is not RAG. Retrieval relevance does not establish evidence truth or trading profitability. Evaluation quality is limited by the small dataset and available indexed sources.
 
+## Market data and context foundation (Phase 2D)
+
+Phase 2D adds in-process `market_data` and `market_context` modules, following the repository's Pydantic contract, service/repository, SQLAlchemy model, and Alembic patterns. `Instrument` normalizes canonical symbol identity. `Timeframe` centralizes the supported intervals and nominal duration; `1d` and `1w` durations do not define market-session boundaries.
+
+Canonical candles use `Decimal` OHLCV, an aware UTC BAR-OPEN timestamp, and optional bid/ask snapshots and spread observations associated with that bar-open instant. A typed historical-provider protocol returns provider/version, provider symbol, timestamp convention, price basis, volume units, retrieval time, and typed rows. Only a deterministic in-memory fixture provider is implemented; no external provider or market-data HTTP endpoint is present. Provider symbols must be connected to an instrument by an explicit mapping.
+
+Normalization validates request identity and `[start, end)` bounds, timestamps, ordering, duplicates, OHLC/volume and quote relationships. It does not sort, drop, repair, or fill rows. Hard issues prevent persistence; warnings such as zero-volume anomalies, candidate gaps without an authoritative calendar, and unknown completeness stay on the dataset report. A supplied completeness policy can make missing expected bars hard failures. Naive timestamps and invalid typed values are rejected; aware instants are normalized to UTC.
+
+PostgreSQL stores instruments, immutable dataset manifests, and candles. Dataset IDs and versions are selected explicitly for range queries; no mutable latest-dataset selection or cross-dataset merging occurs. The manifest records provider/version, request, retrieval/ingestion times, conventions, normalization/validation versions, quality summary, and a deterministic hash of normalized candle content. Session definitions use IANA timezones through `zoneinfo`, support overlaps and weekday windows, and label weekends independently. Generic Asia/London/New York examples are not trading-hour truth; absent an explicit calendar, calendar status is unknown and holidays are not inferred.
+
+**Validation status:** Phase 2D unit tests and Python/static/offline checks pass. Live PostgreSQL migration and retrieval execution have not been verified in the current Windows environment because a migrated Phase 2D test database is unavailable and the local psycopg binary is restricted. SQLite is not evidence for PostgreSQL `NUMERIC`, timezone, constraint, or index behavior. Gated tests in `backend/tests/test_market_data_integration.py` should be run against a PostgreSQL database already migrated to head (`MARKET_DATA_TEST_DATABASE_URL`). This is a validation limitation, not evidence that the implementation is broken.
+
 ## Future components
 
 These are architectural directions only; they are not implemented:
 
 - **Web/YouTube/podcast ingestion** — future source adapters; Phase 2C implemented retrieval and evaluation, not external source downloading or scraping.
-- **Market Data** — historical and live market data adapters.
+- **Market-data integrations** — external historical providers and live feeds beyond the Phase 2D fixture/provider boundary.
 - **Analysis** — market structure and technical analysis.
 - **Risk** — risk controls and position sizing research.
 - **Agent** — language model assisted research workflows.

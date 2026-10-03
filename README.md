@@ -4,7 +4,7 @@ This repository is the foundation of an AI trading research platform. It provide
 
 ## Development stage
 
-Phase 1, Phase 2A (local knowledge ingestion), Phase 2B (embeddings and semantic retrieval), and Phase 2C (lexical/hybrid retrieval and evaluation) are implemented. Market analysis and trading capabilities are not implemented.
+Phase 1, Phase 2A (local knowledge ingestion), Phase 2B (embeddings and semantic retrieval), Phase 2C (lexical/hybrid retrieval and evaluation), and Phase 2D (deterministic market-data/context foundations) are implemented. Market analysis and trading capabilities are not implemented.
 
 ## Technology stack
 
@@ -12,10 +12,10 @@ Python 3.12+, FastAPI, PostgreSQL with pgvector, SQLAlchemy 2.x, Alembic, FastEm
 
 ## Project structure
 
-- `backend/app` — API, configuration, database setup, SQLAlchemy models, embeddings, and knowledge services.
+- `backend/app` — API, configuration, database setup, SQLAlchemy models, embeddings, knowledge, market-data, and market-context services.
 - `backend/app/knowledge` — local text, Markdown, and PDF loading, cleaning, chunking, JSON output, embedding ingestion, and retrieval.
-- `backend/tests` — API and ingestion tests that do not require a database.
-- `backend/alembic` — migration environment and pgvector embedding schema migration.
+- `backend/tests` — deterministic unit tests plus gated PostgreSQL integration tests.
+- `backend/alembic` — migration environment, pgvector/retrieval schema, and market-data schema migrations.
 - `docs` — architecture, development rules, and roadmap.
 - `data` — ignored local data directories.
 - `scripts` — project scripts directory.
@@ -85,6 +85,12 @@ python scripts/evaluate_retrieval.py
 
 The report provides per-query failure details and Recall@K, Precision@K, Hit Rate@K, and MRR@K. The initial dataset is a small check against the fictional sample note, not a representative quality benchmark. Hybrid retrieval is not reranking or RAG, and retrieval quality does not establish trading profitability.
 
+## Market-data foundation (Phase 2D)
+
+Phase 2D defines typed instruments, canonical timeframes, UTC-aware BAR-OPEN candles, provider contracts, normalization and quality reports, immutable dataset snapshots, explicit dataset-scoped range queries, and configurable timezone-aware session labels. A deterministic in-memory fixture provider is included; no external provider, market-data API route, or network download is implemented. Daily/weekly nominal durations do not determine exchange boundaries. Generic Asia/London/New York windows are configurable examples, not broker or exchange hours; without an explicit market calendar, trading status remains unknown.
+
+PostgreSQL is the intended persistence backend. Phase 2D unit and static checks pass, but live PostgreSQL migration and persistence/range-query behavior have not been verified locally because a migrated Phase 2D PostgreSQL test database is unavailable and the Windows environment restricts the psycopg binary. SQLite checks do not validate PostgreSQL-specific behavior. The gated test module can be enabled with `MARKET_DATA_TEST_DATABASE_URL` pointing to a PostgreSQL database already migrated to head; it performs no migrations itself.
+
 ## Run with Docker Compose
 
 From the repository root:
@@ -104,4 +110,4 @@ python -m pip install -r backend/requirements.txt
 python -m pytest backend/tests
 ```
 
-Unit tests use fakes for provider and service orchestration; they do not download model weights or connect to PostgreSQL. Database integration requires a separately migrated pgvector database.
+Unit tests use deterministic fixtures/fakes; they do not download model weights or contact market-data services. PostgreSQL integration tests remain gated and require a separately migrated PostgreSQL + pgvector database. Set `PGVECTOR_TEST_DATABASE_URL` for embedding integration and `MARKET_DATA_TEST_DATABASE_URL` for Phase 2D integration. SQLite does not validate PostgreSQL-specific types or constraints.
