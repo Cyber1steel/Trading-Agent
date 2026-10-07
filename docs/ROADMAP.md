@@ -7,8 +7,9 @@ The master engineering specification has been established in [TRADING_AGENT_SPEC
 - [x] Phase 2B — Embeddings + semantic retrieval
 - [x] Phase 2C — Hybrid knowledge retrieval and evaluation
 - [x] Phase 2D — Deterministic market-data and market-context foundation
+- [x] Phase 2E — Deterministic market-analysis foundation
 - [ ] Phase 3 — External market-data integrations and expanded coverage
-- [ ] Phase 4 — Market/technical analysis
+- [ ] Phase 4 — Expanded market/technical analysis
 - [ ] Phase 5 — Risk engine
 - [ ] Phase 6 — Trading agent
 - [ ] Phase 7 — Backtesting

@@ -1,7 +1,7 @@
 # Trading-Agent Master Engineering Specification
 
 **Status:** Master requirements for future development  
-**Current implementation:** Foundation, Phase 2A ingestion, Phase 2B embeddings/semantic retrieval, Phase 2C lexical/hybrid retrieval/evaluation, and Phase 2D market-data/context foundations
+**Current implementation:** Foundation, Phase 2A ingestion, Phase 2B embeddings/semantic retrieval, Phase 2C lexical/hybrid retrieval/evaluation, Phase 2D market-data/context foundations, and Phase 2E deterministic market analysis
 
 This document is the technical contract for future Trading-Agent work. New designs, implementation prompts, and phase proposals must follow these requirements or explicitly document a justified change to this specification. Requirements for future components describe intended behavior; they do not imply those components exist today.
 
@@ -114,6 +114,12 @@ Before use by analysis, strategy evaluation, or backtesting, data must be checke
 Missing or invalid data must never be silently fabricated or filled. Any permitted normalization or gap treatment must be explicit, justified for the data type, recorded, and tested. Data that fails validation must be rejected, quarantined, or clearly marked unavailable to downstream components. Real-time and historical sources must preserve timestamps that distinguish event time from receipt or processing time.
 
 Phase 2D implements the historical data foundation using typed UTC BAR-OPEN candles, explicit provider metadata, deterministic normalization/quality checks, and immutable PostgreSQL dataset snapshots. Its local fixture provider does not retrieve real markets. Live PostgreSQL validation remains pending in the current Windows environment; SQLite must not be treated as validating PostgreSQL-specific behavior. Session labels are configurable context, not exchange calendars or strategy rules.
+
+### Phase 2E deterministic analysis requirements
+
+Every analysis result must identify the explicit source dataset IDs and versions, source provenance, selected candle slices, analysis version, calculation parameters, input/analysis ranges, and cutoff. These values are required to reproduce an output. Warm-up history is explicit: `input_start` bounds all loaded source candles and affects initial ATR and confirmed-swing availability. Analysis results are in-memory and are not persisted in PostgreSQL.
+
+Canonical timestamps denote BAR-OPEN. A fixed-duration candle becomes knowable at its open plus nominal duration. Primary output bars must be closed by the request cutoff. A swing is not available at its candidate timestamp; it becomes available only when the rightmost required confirmation candle has closed. Higher-timeframe bars are eligible only after their own close is at or before the primary observation's known time, with equality allowed; higher-timeframe swing events must also have been confirmed by then. Calendar-anchored daily and weekly bars are unsupported until authoritative availability semantics exist. Future leakage is a correctness failure. Phase 2E reuses Phase 2D session classification and does not imply holiday or exchange-calendar knowledge.
 
 ## 6. Market context
 
@@ -255,6 +261,6 @@ Success is not “the AI predicts the market correctly.” No architecture can g
 
 ## 22. Current implementation boundary
 
-The current project contains the FastAPI/PostgreSQL foundation, Phase 2A local knowledge ingestion for TXT, Markdown, and text-based PDF documents, Phase 2B/2C source-linked retrieval, and the Phase 2D market-data/context foundation. These capabilities do not establish predictive value or trading performance.
+The current project contains the FastAPI/PostgreSQL foundation, Phase 2A local knowledge ingestion for TXT, Markdown, and text-based PDF documents, Phase 2B/2C source-linked retrieval, the Phase 2D market-data/context foundation, and the Phase 2E deterministic market-analysis foundation. These capabilities do not establish predictive value or trading performance.
 
-The current project includes Phase 1 foundations, Phase 2A local ingestion, Phase 2B local embeddings and semantic retrieval, Phase 2C PostgreSQL lexical/hybrid retrieval with a bootstrap evaluation harness, and Phase 2D deterministic market-data/context foundations with an in-memory fixture provider. Phase 2D live PostgreSQL validation remains pending; its gated PostgreSQL integration tests require a migrated test database. The project does not implement external market-data providers, market analysis, indicators, strategy rules, signals, a risk engine, backtesting, ML models, broker APIs, trading execution, a frontend, or authentication. Those remain future work subject to their own scope and validation.
+The current project includes Phase 1 foundations, Phase 2A local ingestion, Phase 2B local embeddings and semantic retrieval, Phase 2C PostgreSQL lexical/hybrid retrieval with a bootstrap evaluation harness, Phase 2D deterministic market-data/context foundations with an in-memory fixture provider, and Phase 2E deterministic in-memory market analysis. Phase 2D live PostgreSQL validation remains pending; its gated PostgreSQL integration tests require a migrated test database. The project does not implement external market-data providers, expanded analysis indicators, strategy rules, signals, a risk engine, backtesting, ML models, broker APIs, trading execution, a frontend, or authentication. Those remain future work subject to their own scope and validation.

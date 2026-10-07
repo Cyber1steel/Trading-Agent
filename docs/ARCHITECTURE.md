@@ -54,13 +54,25 @@ PostgreSQL stores instruments, immutable dataset manifests, and candles. Dataset
 
 **Validation status:** Phase 2D unit tests and Python/static/offline checks pass. Live PostgreSQL migration and retrieval execution have not been verified in the current Windows environment because a migrated Phase 2D test database is unavailable and the local psycopg binary is restricted. SQLite is not evidence for PostgreSQL `NUMERIC`, timezone, constraint, or index behavior. Gated tests in `backend/tests/test_market_data_integration.py` should be run against a PostgreSQL database already migrated to head (`MARKET_DATA_TEST_DATABASE_URL`). This is a validation limitation, not evidence that the implementation is broken.
 
+## Deterministic market analysis (Phase 2E)
+
+`app.market_analysis` provides a read-only, in-process analysis service over explicitly named Phase 2D dataset IDs and versions. It computes candle features, simple returns, true range, Wilder ATR, strictly confirmed swings, and deterministic swing-structure labels from `Decimal` inputs using a local precision-34, half-even context. `1d` and `1w` are rejected because fixed close-availability semantics are not available. There is no analysis-result persistence or API route.
+
+Every result records its explicit input datasets and versions, full-manifest provenance, selected normalized-candle-slice hashes, analysis version, parameters, requested ranges, cutoff, observations, and deterministic fingerprint. The version and parameters are required to reproduce calculations. `input_start` explicitly bounds warm-up history and affects ATR initialization and swing availability.
+
+All canonical bars are BAR-OPEN timestamps. An observation becomes available only at `bar_open + timeframe duration`; requests fail if any requested primary observation is not closed by `cutoff_at`. A swing is published only when its right-hand confirmation bars have closed, never backfilled to its candidate. Parent bars enter higher-timeframe context only when their close is at or before the primary observation's `known_at`; equality is eligible. Parent swings obey their own confirmation time. A future value affecting an earlier observation is a correctness failure. Phase 2E delegates session labels to Phase 2D and does not infer holidays.
+
+Phase 2E has no database schema or migration changes and adds no strategy, signal, risk, backtest, execution, or LLM capability. Its input is persisted by Phase 2D, so live PostgreSQL validation remains subject to the Phase 2D pending-validation note above.
+
+**Phase 2E validation status:** On Windows CPython 3.12.10 x64, the full unit suite passed (112 passed, 3 PostgreSQL-gated integration tests skipped, 1 warning), the Phase 2E tests passed (33 passed), `python -m compileall backend` passed, and FastAPI startup returned HTTP 200 from `/` and `/health`. PostgreSQL Alembic upgrade SQL for the existing chain and Phase 2D downgrade SQL were generated offline; no database was changed. Windows Application Control blocked SQLAlchemy's compiled extensions and the psycopg binary, so the test run used SQLAlchemy's Python fallback and an in-memory SQLite URL to load the application. SQLite did not validate PostgreSQL-specific behavior, and live PostgreSQL/pgvector migration and retrieval remain unverified as described in the Phase 2D validation note above.
+
 ## Future components
 
 These are architectural directions only; they are not implemented:
 
 - **Web/YouTube/podcast ingestion** — future source adapters; Phase 2C implemented retrieval and evaluation, not external source downloading or scraping.
 - **Market-data integrations** — external historical providers and live feeds beyond the Phase 2D fixture/provider boundary.
-- **Analysis** — market structure and technical analysis.
+- **Expanded analysis** — indicators and analysis beyond the deterministic Phase 2E foundation.
 - **Risk** — risk controls and position sizing research.
 - **Agent** — language model assisted research workflows.
 - **Decision Engine** — explicit orchestration of research outputs.

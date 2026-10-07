@@ -4,7 +4,7 @@ This repository is the foundation of an AI trading research platform. It provide
 
 ## Development stage
 
-Phase 1, Phase 2A (local knowledge ingestion), Phase 2B (embeddings and semantic retrieval), Phase 2C (lexical/hybrid retrieval and evaluation), and Phase 2D (deterministic market-data/context foundations) are implemented. Market analysis and trading capabilities are not implemented.
+Phase 1, Phase 2A (local knowledge ingestion), Phase 2B (embeddings and semantic retrieval), Phase 2C (lexical/hybrid retrieval and evaluation), Phase 2D (deterministic market-data/context foundations), and Phase 2E (deterministic market analysis) are implemented. Strategy, signal, and trading capabilities are not implemented.
 
 ## Technology stack
 
@@ -12,7 +12,7 @@ Python 3.12+, FastAPI, PostgreSQL with pgvector, SQLAlchemy 2.x, Alembic, FastEm
 
 ## Project structure
 
-- `backend/app` — API, configuration, database setup, SQLAlchemy models, embeddings, knowledge, market-data, and market-context services.
+- `backend/app` — API, configuration, database setup, SQLAlchemy models, embeddings, knowledge, market-data, market-context, and deterministic market-analysis services.
 - `backend/app/knowledge` — local text, Markdown, and PDF loading, cleaning, chunking, JSON output, embedding ingestion, and retrieval.
 - `backend/tests` — deterministic unit tests plus gated PostgreSQL integration tests.
 - `backend/alembic` — migration environment, pgvector/retrieval schema, and market-data schema migrations.
@@ -90,6 +90,14 @@ The report provides per-query failure details and Recall@K, Precision@K, Hit Rat
 Phase 2D defines typed instruments, canonical timeframes, UTC-aware BAR-OPEN candles, provider contracts, normalization and quality reports, immutable dataset snapshots, explicit dataset-scoped range queries, and configurable timezone-aware session labels. A deterministic in-memory fixture provider is included; no external provider, market-data API route, or network download is implemented. Daily/weekly nominal durations do not determine exchange boundaries. Generic Asia/London/New York windows are configurable examples, not broker or exchange hours; without an explicit market calendar, trading status remains unknown.
 
 PostgreSQL is the intended persistence backend. Phase 2D unit and static checks pass, but live PostgreSQL migration and persistence/range-query behavior have not been verified locally because a migrated Phase 2D PostgreSQL test database is unavailable and the Windows environment restricts the psycopg binary. SQLite checks do not validate PostgreSQL-specific behavior. The gated test module can be enabled with `MARKET_DATA_TEST_DATABASE_URL` pointing to a PostgreSQL database already migrated to head; it performs no migrations itself.
+
+## Deterministic market analysis (Phase 2E)
+
+`backend/app/market_analysis` performs read-only candle feature, true-range/ATR, confirmed-swing, structure, fixed-duration higher-timeframe, and session-context calculations over explicit Phase 2D dataset IDs and versions. Results carry source provenance, normalized selected-slice hashes, analysis version `2e.1.0`, parameters, ranges, cutoff, and a deterministic fingerprint. Warm-up history is bounded by the explicit `input_start`; analysis is not persisted and has no API route.
+
+An observation is knowable at BAR-OPEN plus its fixed timeframe duration. Unclosed primary bars are rejected at the declared cutoff; swings become visible only after their right-side confirmation bars close. Parent bars are aligned only after their close, including equality at the observation time. Daily and weekly calendar-anchored bars are unsupported. Session labels delegate to the Phase 2D classifier; no exchange holidays are inferred. These timing rules are correctness requirements against future leakage.
+
+Phase 2E adds no database schema or migration, external dependencies, strategies, signals, or trading behavior. PostgreSQL validation status for the Phase 2D source data remains as described above.
 
 ## Run with Docker Compose
 
