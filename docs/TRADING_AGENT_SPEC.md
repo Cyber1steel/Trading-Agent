@@ -1,7 +1,7 @@
 # Trading-Agent Master Engineering Specification
 
 **Status:** Master requirements for future development  
-**Current implementation:** Foundation, Phase 2A ingestion, Phase 2B embeddings/semantic retrieval, Phase 2C lexical/hybrid retrieval/evaluation, Phase 2D market-data/context foundations, and Phase 2E deterministic market analysis
+**Current implementation:** Foundation, Phase 2A ingestion, Phase 2B embeddings/semantic retrieval, Phase 2C lexical/hybrid retrieval/evaluation, Phase 2D market-data/context foundations, Phase 2E deterministic market analysis, and Phase 2F deterministic strategy/setup definition and evaluation
 
 This document is the technical contract for future Trading-Agent work. New designs, implementation prompts, and phase proposals must follow these requirements or explicitly document a justified change to this specification. Requirements for future components describe intended behavior; they do not imply those components exist today.
 
@@ -120,6 +120,12 @@ Phase 2D implements the historical data foundation using typed UTC BAR-OPEN cand
 Every analysis result must identify the explicit source dataset IDs and versions, source provenance, selected candle slices, analysis version, calculation parameters, input/analysis ranges, and cutoff. These values are required to reproduce an output. Warm-up history is explicit: `input_start` bounds all loaded source candles and affects initial ATR and confirmed-swing availability. Analysis results are in-memory and are not persisted in PostgreSQL.
 
 Canonical timestamps denote BAR-OPEN. A fixed-duration candle becomes knowable at its open plus nominal duration. Primary output bars must be closed by the request cutoff. A swing is not available at its candidate timestamp; it becomes available only when the rightmost required confirmation candle has closed. Higher-timeframe bars are eligible only after their own close is at or before the primary observation's known time, with equality allowed; higher-timeframe swing events must also have been confirmed by then. Calendar-anchored daily and weekly bars are unsupported until authoritative availability semantics exist. Future leakage is a correctness failure. Phase 2E reuses Phase 2D session classification and does not imply holiday or exchange-calendar knowledge.
+
+### Phase 2F deterministic strategy/setup foundation
+
+Phase 2F defines immutable, explicitly versioned strategy and setup definitions and evaluates typed conditions against a supplied Phase 2E `AnalysisResult`. The evaluator uses a closed field allowlist, strict declared parameters, three-valued condition logic, provenance-linked evidence, deterministic lifecycle transitions, exact observation-time cutoffs, and reproducible fingerprints. It verifies Phase 2E's full-result fingerprint and also derives a separate evaluation-visible prefix identity. The first observation is left-censored; a candidate starts only after the qualifying activation is observed false and then true within the supplied analysis range. Evaluation does not invent lifecycle state before that range, fetch data, persist state, or expose an API.
+
+Phase 2F defines and evaluates deterministic setups; it does not establish predictive value or trading performance. Historical backtesting, walk-forward validation, Monte Carlo, risk, position sizing, stop-loss/take-profit, broker integration, paper trading, live execution, LLM reasoning, RAG, persistence, and API routes remain future work.
 
 ## 6. Market context
 
@@ -261,6 +267,6 @@ Success is not “the AI predicts the market correctly.” No architecture can g
 
 ## 22. Current implementation boundary
 
-The current project contains the FastAPI/PostgreSQL foundation, Phase 2A local knowledge ingestion for TXT, Markdown, and text-based PDF documents, Phase 2B/2C source-linked retrieval, the Phase 2D market-data/context foundation, and the Phase 2E deterministic market-analysis foundation. These capabilities do not establish predictive value or trading performance.
+The current project contains the FastAPI/PostgreSQL foundation, Phase 2A local knowledge ingestion for TXT, Markdown, and text-based PDF documents, Phase 2B/2C source-linked retrieval, the Phase 2D market-data/context foundation, the Phase 2E deterministic market-analysis foundation, and the Phase 2F deterministic strategy/setup definition and evaluation foundation. These capabilities do not establish predictive value or trading performance.
 
-The current project includes Phase 1 foundations, Phase 2A local ingestion, Phase 2B local embeddings and semantic retrieval, Phase 2C PostgreSQL lexical/hybrid retrieval with a bootstrap evaluation harness, Phase 2D deterministic market-data/context foundations with an in-memory fixture provider, and Phase 2E deterministic in-memory market analysis. Phase 2D live PostgreSQL validation remains pending; its gated PostgreSQL integration tests require a migrated test database. The project does not implement external market-data providers, expanded analysis indicators, strategy rules, signals, a risk engine, backtesting, ML models, broker APIs, trading execution, a frontend, or authentication. Those remain future work subject to their own scope and validation.
+The current project includes Phase 1 foundations, Phase 2A local ingestion, Phase 2B local embeddings and semantic retrieval, Phase 2C PostgreSQL lexical/hybrid retrieval with a bootstrap evaluation harness, Phase 2D deterministic market-data/context foundations with an in-memory fixture provider, Phase 2E deterministic in-memory market analysis, and Phase 2F in-memory deterministic setup evaluation. Phase 2D live PostgreSQL validation remains pending; its gated PostgreSQL integration tests require a migrated test database. The project does not implement external market-data providers, expanded analysis indicators, signals, a risk engine, backtesting, ML models, broker APIs, trading execution, a frontend, or authentication. Those remain future work subject to their own scope and validation.

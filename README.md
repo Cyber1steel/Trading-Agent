@@ -1,10 +1,10 @@
 # Trading Agent
 
-This repository is the foundation of an AI trading research platform. It provides a minimal FastAPI service, PostgreSQL connection setup, Alembic migration configuration, and a local document ingestion pipeline. **Trading functionality has not been implemented.**
+This repository is the foundation of an AI trading research platform. It provides a minimal FastAPI service, PostgreSQL connection setup, Alembic migration configuration, local document ingestion, deterministic market analysis, and deterministic setup evaluation. **Trading execution and performance validation have not been implemented.**
 
 ## Development stage
 
-Phase 1, Phase 2A (local knowledge ingestion), Phase 2B (embeddings and semantic retrieval), Phase 2C (lexical/hybrid retrieval and evaluation), Phase 2D (deterministic market-data/context foundations), and Phase 2E (deterministic market analysis) are implemented. Strategy, signal, and trading capabilities are not implemented.
+Phase 1, Phase 2A (local knowledge ingestion), Phase 2B (embeddings and semantic retrieval), Phase 2C (lexical/hybrid retrieval and evaluation), Phase 2D (deterministic market-data/context foundations), Phase 2E (deterministic market analysis), and Phase 2F (deterministic strategy/setup definition and evaluation) are implemented. Backtesting, signals, risk controls, and trading capabilities are not implemented.
 
 ## Technology stack
 
@@ -12,7 +12,7 @@ Python 3.12+, FastAPI, PostgreSQL with pgvector, SQLAlchemy 2.x, Alembic, FastEm
 
 ## Project structure
 
-- `backend/app` — API, configuration, database setup, SQLAlchemy models, embeddings, knowledge, market-data, market-context, and deterministic market-analysis services.
+- `backend/app` — API, configuration, database setup, SQLAlchemy models, embeddings, knowledge, market-data/context, deterministic market-analysis, and in-memory strategy evaluation.
 - `backend/app/knowledge` — local text, Markdown, and PDF loading, cleaning, chunking, JSON output, embedding ingestion, and retrieval.
 - `backend/tests` — deterministic unit tests plus gated PostgreSQL integration tests.
 - `backend/alembic` — migration environment, pgvector/retrieval schema, and market-data schema migrations.
@@ -98,6 +98,12 @@ PostgreSQL is the intended persistence backend. Phase 2D unit and static checks 
 An observation is knowable at BAR-OPEN plus its fixed timeframe duration. Unclosed primary bars are rejected at the declared cutoff; swings become visible only after their right-side confirmation bars close. Parent bars are aligned only after their close, including equality at the observation time. Daily and weekly calendar-anchored bars are unsupported. Session labels delegate to the Phase 2D classifier; no exchange holidays are inferred. These timing rules are correctness requirements against future leakage.
 
 Phase 2E adds no database schema or migration, external dependencies, strategies, signals, or trading behavior. PostgreSQL validation status for the Phase 2D source data remains as described above.
+
+## Deterministic strategy/setup foundation (Phase 2F)
+
+`backend/app/strategy` defines immutable, explicitly versioned strategy/setup contracts and evaluates their typed conditions against a supplied Phase 2E `AnalysisResult`. Evaluation uses three-valued logic, provenance-linked evidence, deterministic lifecycle transitions, exact UTC observation cutoffs, and SHA-256 fingerprints. The first supplied observation is left-censored: an already-true qualifying condition cannot create a candidate until a prior supplied observation establishes it was false. Phase 2F verifies the full Phase 2E fingerprint and separately derives a cutoff-visible prefix identity; full provenance is retained while future suffixes do not alter the decision fingerprint. It is a pure in-memory evaluation layer: it does not query datasets or persist definitions/results.
+
+Phase 2F defines and evaluates deterministic setups. It does not establish setup quality or trading performance. Backtesting, walk-forward validation, Monte Carlo, a risk engine, position sizing, stop-loss/take-profit management, broker integration, paper trading, live execution, LLM reasoning, RAG, persistence, and strategy API routes remain future work. Phase 2F has no migration or dependency changes.
 
 ## Run with Docker Compose
 

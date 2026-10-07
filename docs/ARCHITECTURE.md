@@ -4,7 +4,7 @@ The project-wide engineering contract for future architecture and implementation
 
 ## Current foundation
 
-The current system is a small FastAPI service. Its API routes live separately from application configuration and database infrastructure. SQLAlchemy provides a PostgreSQL engine and session factory; Alembic manages the application schema. No trading behavior exists yet.
+The current system is a small FastAPI service. Its API routes live separately from application configuration and database infrastructure. SQLAlchemy provides a PostgreSQL engine and session factory; Alembic manages the application schema. Phase 2F adds deterministic in-memory setup evaluation; signals, risk decisions, trade simulation, and execution do not exist.
 
 ## Knowledge ingestion (Phase 2A)
 
@@ -66,6 +66,12 @@ Phase 2E has no database schema or migration changes and adds no strategy, signa
 
 **Phase 2E validation status:** On Windows CPython 3.12.10 x64, the full unit suite passed (112 passed, 3 PostgreSQL-gated integration tests skipped, 1 warning), the Phase 2E tests passed (33 passed), `python -m compileall backend` passed, and FastAPI startup returned HTTP 200 from `/` and `/health`. PostgreSQL Alembic upgrade SQL for the existing chain and Phase 2D downgrade SQL were generated offline; no database was changed. Windows Application Control blocked SQLAlchemy's compiled extensions and the psycopg binary, so the test run used SQLAlchemy's Python fallback and an in-memory SQLite URL to load the application. SQLite did not validate PostgreSQL-specific behavior, and live PostgreSQL/pgvector migration and retrieval remain unverified as described in the Phase 2D validation note above.
 
+## Deterministic strategy/setup evaluation (Phase 2F)
+
+`backend/app/strategy` consumes a caller-supplied Phase 2E `AnalysisResult` and exact, immutable strategy/setup versions. Its closed condition model supports typed comparisons and AND/OR/NOT with `TRUE`, `FALSE`, or `INSUFFICIENT` outcomes. The pure evaluator replays eligible primary observations, applies explicit candidate/confirmation/invalidation/expiry ordering, emits provenance references and lifecycle transitions, and fingerprints definitions and evaluation output. Higher-timeframe values are guarded by parent-close and event-known-at checks. The evaluator recomputes and verifies the full Phase 2E result identity, then derives an evaluation-visible prefix identity from inputs and observations known by the requested time. Full analysis identity remains in the result and evidence; the decision digest binds the prefix, so an unchanged visible prefix is invariant to future suffix changes. The first supplied observation is left-censored: candidate creation requires a prior supplied observation where the combined prerequisite/context and entry activation was false, followed by a true activation. The evaluator has no repository, filesystem, network, database, or clock access.
+
+Lifecycle ordering is explicit: evaluate current prerequisites/context, invalidate an existing candidate or confirmed setup, apply candidate expiry, evaluate confirmation, then create a new candidate. Expiry is measured in later primary observations: the entry observation is observation zero, and the candidate expires when the count of later observations reaches `max_later_observations`; expiry wins over confirmation on that boundary. Invalidation wins over expiry when both become true on the same observation. Phase 2F defines and evaluates deterministic setups. It does not validate profitability or simulate trades. Backtesting, walk-forward validation, Monte Carlo, risk, position sizing, SL/TP, broker integration, paper/live execution, LLM/RAG, persistence, and API routes remain future work. Phase 2F introduces no database schema or dependency. Runtime validation for this phase is reported separately from the Phase 2E validation above.
+
 ## Future components
 
 These are architectural directions only; they are not implemented:
@@ -73,6 +79,7 @@ These are architectural directions only; they are not implemented:
 - **Web/YouTube/podcast ingestion** — future source adapters; Phase 2C implemented retrieval and evaluation, not external source downloading or scraping.
 - **Market-data integrations** — external historical providers and live feeds beyond the Phase 2D fixture/provider boundary.
 - **Expanded analysis** — indicators and analysis beyond the deterministic Phase 2E foundation.
+- **Historical strategy validation** — backtesting and walk-forward evaluation of Phase 2F definitions.
 - **Risk** — risk controls and position sizing research.
 - **Agent** — language model assisted research workflows.
 - **Decision Engine** — explicit orchestration of research outputs.
