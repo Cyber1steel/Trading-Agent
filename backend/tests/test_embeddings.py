@@ -1,5 +1,6 @@
 import hashlib
 from pathlib import Path
+from datetime import datetime, timezone
 
 import pytest
 
@@ -56,8 +57,9 @@ class FakeRepository:
         return self.hits[:top_k]
 
 
-def document(path: Path, text="Evidence chunk"):
-    source = SourceMetadata(source_id="source-1", source_type="txt", title="A title", file_path="notes.txt")
+def document(path: Path, text="Evidence chunk", published_at=None):
+    source = SourceMetadata(source_id="source-1", source_type="txt", title="A title", file_path="notes.txt",
+        published_at=published_at)
     chunk = DocumentChunk(chunk_id="chunk-1", source_id=source.source_id, source_type="txt", title=source.title,
         file_path=source.file_path, chunk_index=0, char_start=0, char_end=len(text), text=text)
     return ProcessedDocument(source=source, chunk_size=100, overlap=10, extracted_characters=len(text),
@@ -102,13 +104,14 @@ def test_ingestion_batches_idempotently_and_rejects_bad_json(tmp_path):
 
 def test_retrieval_empty_query_top_k_filters_and_provenance(tmp_path):
     processed = tmp_path / "source.json"
-    doc = document(processed)
+    published_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    doc = document(processed, published_at=published_at)
     processed.write_text(doc.model_dump_json(), encoding="utf-8")
     chunk = doc.chunks[0]
     repo = FakeRepository()
     repo.hits = [StoredEmbeddingHit(chunk_id=chunk.chunk_id, source_id=chunk.source_id,
         source_type=chunk.source_type, title=chunk.title, author=None, source_url=None,
-        source_file_path=chunk.file_path, processed_file_path=str(processed), published_at=None,
+        source_file_path=chunk.file_path, processed_file_path=str(processed), published_at=published_at,
         page_number=None, chunk_index=0, char_start=0, char_end=len(chunk.text),
         content_sha256=hashlib.sha256(chunk.text.encode()).hexdigest(), distance=0.12)]
     provider = FakeProvider()
@@ -117,6 +120,8 @@ def test_retrieval_empty_query_top_k_filters_and_provenance(tmp_path):
     filters = RetrievalFilters(document_id="source-1", source_type="txt")
     result = service.search("market setup", top_k=1, filters=filters)[0]
     assert result.text == chunk.text and result.document_id == "source-1"
+    assert result.content_sha256 == hashlib.sha256(chunk.text.encode()).hexdigest()
+    assert result.published_at == published_at
     assert result.distance == 0.12 and result.page_number is None
     assert result.retrieval_mode == "semantic" and result.semantic_rank == 1
     assert repo.search_args[1:] == (1, filters)

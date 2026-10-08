@@ -102,12 +102,14 @@ class RetrievalResult(BaseModel):
     title: str
     author: str | None
     source_url: str | None
+    published_at: datetime | None = None
     file_path: str
     page_number: int | None
     chunk_index: int
     char_start: int | None
     char_end: int | None
     text: str
+    content_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     distance: float | None = Field(default=None, ge=0, le=2)
     embedding_provider: str | None = None
     embedding_model: str | None = None

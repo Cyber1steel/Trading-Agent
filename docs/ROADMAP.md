@@ -12,6 +12,7 @@ The master engineering specification has been established in [TRADING_AGENT_SPEC
 - [x] Phase 2G — Historical validation & backtesting foundation
 - [x] Phase 2H — Deterministic risk engine
 - [x] Phase 2I — Deterministic trade candidate and evidence foundation
+- [x] Phase 3A — LLM reasoning and evidence orchestration foundation
 - [ ] Phase 3 — External market-data integrations and expanded coverage
 - [ ] Phase 4 — Expanded market/technical analysis
 - [ ] Phase 5 — Trading agent
