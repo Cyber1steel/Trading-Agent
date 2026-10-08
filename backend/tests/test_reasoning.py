@@ -205,8 +205,8 @@ def test_prompt_contract_version_is_part_of_reasoning_identity():
     context = _context()
     fields = context.model_dump(mode="python", exclude={"fingerprint"})
     fields["prompt_contract_version"] = "3a-prompt.2.0"
-    changed = type(context).model_validate({**fields, "fingerprint": digest(fields, domain="reasoning-context")})
-    assert changed.fingerprint != context.fingerprint
+    with pytest.raises(ValidationError, match="prompt contract version is unsupported"):
+        type(context).model_validate({**fields, "fingerprint": digest(fields, domain="reasoning-context")})
 
 
 def test_context_builder_uses_injected_existing_retrieval_service():

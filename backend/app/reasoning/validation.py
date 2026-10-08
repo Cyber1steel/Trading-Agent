@@ -13,7 +13,28 @@ from app.reasoning.contracts import (
 from app.reasoning.errors import ReasoningValidationError
 
 _UNSAFE_FUTURE_CLAIM = re.compile(
-    r"\b(will\s+(?:make|earn|return|profit)|guaranteed\s+(?:profit|return)|risk[- ]free|certain\s+profit)\b",
+    r"\b(?:will\s+(?:make|earn|return|profit|generate|produce)|"
+    r"(?:would|should|expect(?:ed)?\s+to|project(?:ed)?\s+to|forecast(?:ed)?\s+to|likely\s+to)\s+"
+    r"(?:make|earn|return|profit|generate|produce)|guaranteed\s+(?:profit|return)|risk[- ]free|certain\s+profit)\b",
+    re.IGNORECASE,
+)
+_RISK_OVERRIDE_CLAIM = re.compile(
+    r"\b(?:(?:increase|raise|reduce|lower|move|adjust|change|override|ignore)\s+(?:the\s+)?"
+    r"(?:entry|stop(?:[- ]loss)?|take[- ]profit|quantity|position\s+size|lot(?:\s+size)?|"
+    r"risk(?:\s+(?:limit|amount|percentage|budget))?|execution\s+assumptions?)|"
+    r"set\s+(?:the\s+)?(?:account\s+currency|currency|quantity|position\s+size|lot(?:\s+size)?))\b",
+    re.IGNORECASE,
+)
+_UNSUPPORTED_CONFIDENCE_CLAIM = re.compile(
+    r"\b(?:\d+(?:\.\d+)?\s*%\s*(?:certain|confident|likely|chance|probability)|"
+    r"(?:certain|confident|likely)\s+(?:to\s+win|to\s+profit|that\s+.{0,80}\b(?:win|profit|return))|"
+    r"(?:win|profit|success)\s+probability|(?:chance|probability|odds)\s+(?:of\s+)?(?:winning|profit|success))\b",
+    re.IGNORECASE,
+)
+_UNSAFE_META_INSTRUCTION = re.compile(
+    r"\b(?:ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions|"
+    r"reveal\s+(?:the\s+)?(?:system\s+)?prompt|"
+    r"always\s+recommend\s+(?:buy|sell))\b",
     re.IGNORECASE,
 )
 _NUMERIC_LITERAL = re.compile(r"(?<![A-Za-z0-9_])[-+]?(?:\d+(?:\.\d*)?|\.\d+)%?(?![A-Za-z0-9_])")
@@ -51,6 +72,12 @@ def validate_proposal(proposal: ReasoningProposal, context: ReasoningContext) ->
         *proposal.limitations,
     )
     for text in free_text:
+        if _RISK_OVERRIDE_CLAIM.search(text):
+            raise ReasoningValidationError("provider text attempts to change authoritative risk or execution inputs")
+        if _UNSUPPORTED_CONFIDENCE_CLAIM.search(text):
+            raise ReasoningValidationError("provider text makes an unsupported confidence or win-probability claim")
+        if _UNSAFE_META_INSTRUCTION.search(text):
+            raise ReasoningValidationError("provider text follows an instruction that is outside the reasoning contract")
         for token in _NUMERIC_LITERAL.findall(text):
             percentage = token.endswith("%")
             try:
@@ -66,7 +93,7 @@ def validate_proposal(proposal: ReasoningProposal, context: ReasoningContext) ->
             ):
                 raise ReasoningValidationError("explanation contains an unsupported numerical claim")
     if any(_UNSAFE_FUTURE_CLAIM.search(text) for text in free_text):
-        raise ReasoningValidationError("unsupported future-profitability claim")
+        raise ReasoningValidationError("unsupported future-performance claim")
 
     candidate_status = context.effective_candidate_status
     if candidate_status is CandidateStatus.REJECTED:

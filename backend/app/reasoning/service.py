@@ -25,6 +25,8 @@ from app.reasoning.fingerprints import PROMPT_CONTRACT_VERSION, result_fingerpri
 from app.reasoning.prompt import PromptEnvelope
 from app.reasoning.validation import validate_proposal
 
+MAX_PROVIDER_RESPONSE_CHARS = 65536
+
 
 def _forced_status(context):
     return {
@@ -72,6 +74,8 @@ class ReasoningService:
             reply = self.provider.generate(PromptEnvelope(request))
             if not reply.provider_id or not reply.model_id:
                 raise ProviderUnavailable("provider/model identity is missing")
+            if type(reply.raw_response) is not str or len(reply.raw_response) > MAX_PROVIDER_RESPONSE_CHARS:
+                raise ProviderError("provider response is missing or exceeds the configured size limit")
             if type(reply.request_metadata) is not tuple or any(
                 type(entry) is not tuple or len(entry) != 2 for entry in reply.request_metadata
             ):

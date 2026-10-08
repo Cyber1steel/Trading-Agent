@@ -387,6 +387,8 @@ class ReasoningContext(MarketDataModel):
 
     @model_validator(mode="after")
     def consistent_context(self):
+        if self.prompt_contract_version != PROMPT_CONTRACT_VERSION:
+            raise ValueError("reasoning context prompt contract version is unsupported")
         if self.candidate.evaluation_at > self.evaluation_time:
             raise ValueError("candidate evaluation is later than reasoning time")
         expected_status = self.candidate.status
