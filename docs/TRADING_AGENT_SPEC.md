@@ -1,7 +1,7 @@
 # Trading-Agent Master Engineering Specification
 
 **Status:** Master requirements for future development  
-**Current implementation:** Foundation, Phase 2A ingestion, Phase 2B embeddings/semantic retrieval, Phase 2C lexical/hybrid retrieval/evaluation, Phase 2D market-data/context foundations, Phase 2E deterministic market analysis, Phase 2F deterministic strategy/setup evaluation, Phase 2G in-process backtesting foundation, and Phase 2H single-trade risk calculation
+**Current implementation:** Foundation, Phase 2A ingestion, Phase 2B embeddings/semantic retrieval, Phase 2C lexical/hybrid retrieval/evaluation, Phase 2D market-data/context foundations, Phase 2E deterministic market analysis, Phase 2F deterministic strategy/setup evaluation, Phase 2G in-process backtesting foundation, Phase 2H single-trade risk calculation, and Phase 2I deterministic trade-candidate/evidence assembly
 
 This document is the technical contract for future Trading-Agent work. New designs, implementation prompts, and phase proposals must follow these requirements or explicitly document a justified change to this specification. Requirements for future components describe intended behavior; they do not imply those components exist today.
 
@@ -71,14 +71,15 @@ The architecture is a set of conceptual components, not a mandate to create a mi
 9. **Setup detection** identifies candidate situations according to those rules; a candidate is not yet a validated signal or order.
 10. **Signal validation** checks data quality, rule conditions, timing, and evidence before producing a structured hypothesis or WAIT state.
 11. **Risk engine** independently calculates limits and may reject a candidate regardless of its apparent analytical quality.
-12. **Backtesting engine** simulates strategy behavior on historical data under documented execution assumptions.
-13. **Robustness testing** evaluates sensitivity to periods, regimes, parameters, costs, and other relevant perturbations.
-14. **Paper trading** observes prospective hypotheses and simulates execution, preserving assumptions and outcomes.
-15. **Trade journal** records proposed, accepted, rejected, simulated, and (only if later authorized) executed decisions and their context.
-16. **Performance analytics** summarizes outcomes with multiple complementary metrics and links each result to its data and strategy versions.
-17. **Agent orchestration** coordinates research and analysis requests, provides source-linked explanations, and invokes deterministic components through constrained interfaces.
-18. **Monitoring and observability** records system health, data freshness, component failures, decisions, risk checks, and later outcomes.
-19. A **future execution layer**, if ever justified, would receive only validated, risk-approved instructions and would require explicit operational controls. It is not part of the initial system.
+12. **Trade-candidate assembly** verifies and composes the exact analysis, strategy evaluation, risk result, and execution assumptions into an immutable, source-linked research artifact; it does not recalculate lower-layer decisions.
+13. **Backtesting engine** simulates strategy behavior on historical data under documented execution assumptions.
+14. **Robustness testing** evaluates sensitivity to periods, regimes, parameters, costs, and other relevant perturbations.
+15. **Paper trading** observes prospective hypotheses and simulates execution, preserving assumptions and outcomes.
+16. **Trade journal** records proposed, accepted, rejected, simulated, and (only if later authorized) executed decisions and their context.
+17. **Performance analytics** summarizes outcomes with multiple complementary metrics and links each result to its data and strategy versions.
+18. **Agent orchestration** coordinates research and analysis requests, provides source-linked explanations, and invokes deterministic components through constrained interfaces.
+19. **Monitoring and observability** records system health, data freshness, component failures, decisions, risk checks, and later outcomes.
+20. A **future execution layer**, if ever justified, would receive only validated, risk-approved instructions and would require explicit operational controls. It is not part of the initial system.
 
 The intended flow is source ingestion and validated market data into processing and analysis; analysis and strategy rules produce candidate hypotheses; independent signal and risk checks accept, reject, or defer those candidates; simulation and evaluation measure results; journals and monitoring preserve the full chain. No LLM may skip a validation, risk, or authorization boundary.
 
@@ -134,6 +135,12 @@ Phase 2G replays supplied Phase 2E analysis and Phase 2F setup definitions over 
 ### Phase 2H deterministic single-trade risk calculation
 
 Phase 2H evaluates explicit trade inputs against risk configuration using Decimal arithmetic, a caller-supplied PnL-to-account-currency conversion rate, execution-cost estimates, quantity rounding, and configured single-trade limits. It returns valid, rejected, or insufficient-evidence status with request-bound provenance/fingerprints. It does not obtain or validate the conversion-rate source, select a trade, create stops/targets, manage a portfolio, model leverage/margin or aggregate loss limits, persist results, or authorize execution. A valid result is not an endorsement or a performance claim.
+
+### Phase 2I deterministic trade-candidate and evidence foundation
+
+Phase 2I composes existing Phase 2E analysis, Phase 2F setup evaluation, Phase 2H risk request/result, and shared execution assumptions. It verifies artifact identities, fingerprints, timestamps, evidence provenance, risk inputs/outputs, and price relationships without rerunning setup evaluation or risk sizing. Its immutable candidate and evidence package distinguish `ACTIONABLE`, `WAIT`, `INSUFFICIENT_EVIDENCE`, and `REJECTED`; only a confirmed setup with complete, consistent evidence and a valid risk result can be actionable. This output is research data, not an order or trading authorization. The repository already assigned Phase 2H to the risk engine, so this next layer is numbered Phase 2I.
+
+The future LLM may explain, compare, or identify missing/conflicting evidence from the candidate package, but it must not invent or modify prices, quantity, risk, deterministic constraints, or evidence. No LLM reasoning implementation is included.
 
 ## 6. Market context
 
@@ -275,6 +282,6 @@ Success is not “the AI predicts the market correctly.” No architecture can g
 
 ## 22. Current implementation boundary
 
-The current project contains the FastAPI/PostgreSQL foundation, Phase 2A local knowledge ingestion for TXT, Markdown, and text-based PDF documents, Phase 2B/2C source-linked retrieval, the Phase 2D market-data/context foundation, the Phase 2E deterministic market-analysis foundation, the Phase 2F deterministic strategy/setup foundation, the Phase 2G backtesting foundation, and the Phase 2H single-trade risk calculator. These capabilities do not establish predictive value or trading performance.
+The current project contains the FastAPI/PostgreSQL foundation, Phase 2A local knowledge ingestion for TXT, Markdown, and text-based PDF documents, Phase 2B/2C source-linked retrieval, the Phase 2D market-data/context foundation, the Phase 2E deterministic market-analysis foundation, the Phase 2F deterministic strategy/setup foundation, the Phase 2G backtesting foundation, the Phase 2H single-trade risk calculator, and the Phase 2I trade-candidate/evidence assembler. These capabilities do not establish predictive value or trading performance.
 
-The current project includes Phase 1 foundations, Phase 2A local ingestion, Phase 2B local embeddings and semantic retrieval, Phase 2C PostgreSQL lexical/hybrid retrieval with a bootstrap evaluation harness, Phase 2D deterministic market-data/context foundations with an in-memory fixture provider, Phase 2E deterministic in-memory market analysis, Phase 2F in-memory deterministic setup evaluation, Phase 2G in-process backtesting, and Phase 2H a single-trade deterministic risk calculator. Phase 2D live PostgreSQL validation remains pending; its gated PostgreSQL integration tests require a migrated test database. The project does not implement external market-data providers, expanded analysis indicators, portfolio risk, walk-forward/out-of-sample validation, ML models, broker APIs, trading execution, a frontend, or authentication. Those remain future work subject to their own scope and validation.
+The current project includes Phase 1 foundations, Phase 2A local ingestion, Phase 2B local embeddings and semantic retrieval, Phase 2C PostgreSQL lexical/hybrid retrieval with a bootstrap evaluation harness, Phase 2D deterministic market-data/context foundations with an in-memory fixture provider, Phase 2E deterministic in-memory market analysis, Phase 2F in-memory deterministic setup evaluation, Phase 2G in-process backtesting, Phase 2H a single-trade deterministic risk calculator, and Phase 2I in-memory trade-candidate/evidence assembly. Phase 2D live PostgreSQL validation remains pending; its gated PostgreSQL integration tests require a migrated test database. The project does not implement external market-data providers, expanded analysis indicators, portfolio risk, walk-forward/out-of-sample validation, ML models, broker APIs, trading execution, a frontend, or authentication. Those remain future work subject to their own scope and validation.

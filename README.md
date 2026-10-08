@@ -1,10 +1,10 @@
 # Trading Agent
 
-This repository is the foundation of an AI trading research platform. It provides a minimal FastAPI service, PostgreSQL connection setup, Alembic migration configuration, local document ingestion and retrieval, deterministic market analysis and setup evaluation, an in-process historical backtesting foundation, and an independent deterministic risk calculator. **These research foundations do not establish profitable performance; trading execution has not been implemented.**
+This repository is the foundation of an AI trading research platform. It provides a minimal FastAPI service, PostgreSQL connection setup, Alembic migration configuration, local document ingestion and retrieval, deterministic market analysis and setup evaluation, an in-process historical backtesting foundation, an independent deterministic risk calculator, and an immutable trade-candidate/evidence boundary. **These research foundations do not establish profitable performance; trading execution has not been implemented.**
 
 ## Development stage
 
-Phases 1 and 2A–2H are implemented as foundations: knowledge ingestion/retrieval, market data/context, deterministic analysis and strategy evaluation, in-process backtesting, and independent risk calculations. Backtesting and risk calculations are limited research components, not evidence of strategy performance or trading readiness. No broker integration, order execution, paper trading, or live trading is implemented.
+Phases 1 and 2A–2I are implemented as foundations: knowledge ingestion/retrieval, market data/context, deterministic analysis and strategy evaluation, in-process backtesting, independent risk calculations, and deterministic candidate/evidence assembly. These are limited research components, not evidence of strategy performance or trading readiness. No LLM reasoning layer, broker integration, order execution, paper trading, or live trading is implemented. The repository previously used Phase 2H for the risk engine; the candidate/evidence foundation therefore follows it as Phase 2I to preserve the committed phase history.
 
 ## Technology stack
 
@@ -12,7 +12,7 @@ Python 3.12+, FastAPI, PostgreSQL with pgvector, SQLAlchemy 2.x, Alembic, FastEm
 
 ## Project structure
 
-- `backend/app` — API, configuration, database setup, SQLAlchemy models, embeddings, knowledge, market-data/context, deterministic market analysis and strategy evaluation, backtesting, and risk calculation.
+- `backend/app` — API, configuration, database setup, SQLAlchemy models, embeddings, knowledge, market-data/context, deterministic market analysis and strategy evaluation, backtesting, risk calculation, and trade-candidate assembly.
 - `backend/app/knowledge` — local text, Markdown, and PDF loading, cleaning, chunking, JSON output, embedding ingestion, and retrieval.
 - `backend/tests` — deterministic unit tests plus gated PostgreSQL integration tests.
 - `backend/alembic` — migration environment, pgvector/retrieval schema, and market-data schema migrations.
@@ -103,7 +103,7 @@ Phase 2E adds no database schema or migration, external dependencies, strategies
 
 `backend/app/strategy` defines immutable, explicitly versioned strategy/setup contracts and evaluates their typed conditions against a supplied Phase 2E `AnalysisResult`. Evaluation uses three-valued logic, provenance-linked evidence, deterministic lifecycle transitions, exact UTC observation cutoffs, and SHA-256 fingerprints. The first supplied observation is left-censored: an already-true qualifying condition cannot create a candidate until a prior supplied observation establishes it was false. Phase 2F verifies the full Phase 2E fingerprint and separately derives a cutoff-visible prefix identity; full provenance is retained while future suffixes do not alter the decision fingerprint. It is a pure in-memory evaluation layer: it does not query datasets or persist definitions/results.
 
-Phase 2F defines and evaluates deterministic setups but does not establish setup quality or trading performance. Phases 2G/2H add limited backtest and single-trade risk foundations below. Walk-forward validation, Monte Carlo, portfolio controls, stop-loss/take-profit lifecycle management, broker integration, paper trading, live execution, LLM reasoning, RAG, persistence, and strategy/risk API routes remain future work. Phase 2F itself has no migration or dependency changes.
+Phase 2F defines and evaluates deterministic setups but does not establish setup quality or trading performance. Phases 2G/2H/2I add limited backtest, single-trade risk, and immutable candidate/evidence foundations below. Walk-forward validation, Monte Carlo, portfolio controls, stop-loss/take-profit lifecycle management, broker integration, paper trading, live execution, LLM reasoning, RAG, persistence, and strategy/risk API routes remain future work. Phase 2F itself has no migration or dependency changes.
 
 ## Historical backtesting foundation (Phase 2G)
 
@@ -116,6 +116,12 @@ This is a deterministic simulation foundation, not a validated performance repor
 `backend/app/risk` evaluates an explicit trade proposal against immutable risk configuration using Decimal arithmetic. It requires a supplied positive PnL-to-account-currency conversion rate, includes modeled execution costs in downside sizing, rounds quantity down to the configured increment, and returns `RISK_VALID`, `RISK_REJECTED`, or `INSUFFICIENT_EVIDENCE` with a request-bound fingerprint. The engine does not select trades, create stops/targets, integrate with a broker, persist decisions, or authorize execution. Configuration and conversion inputs are caller-supplied evidence; this module does not fetch exchange rates or verify their source.
 
 The Phase 2H calculator is not portfolio risk management: it does not model leverage/margin, correlated exposure, daily or weekly loss limits, drawdown controls, or dynamic account equity. A valid calculation only means the supplied inputs satisfy the implemented single-trade checks; it does not mean a trade is suitable or profitable.
+
+## Deterministic trade candidate and evidence foundation (Phase 2I)
+
+`backend/app/trade_candidate` composes a supplied Phase 2E analysis result, Phase 2F strategy/setup evaluation, Phase 2H risk request/result, and the same execution assumptions used by that risk request. It does not recompute setup conditions or position sizing. Before an `ACTIONABLE` candidate can be returned, the service checks artifact fingerprints, strategy/setup/dataset identities, the exact evaluation observation, source-linked evidence timestamps, risk-request binding, price relationships, stop distance, risk budget, and execution assumptions. Candidate quantity and downside are copied from the RiskResult; reward/risk is present only when a target is supplied.
+
+Candidates and evidence packages are frozen, nested immutable contracts with deterministic fingerprints and an ID derived from that fingerprint. Statuses distinguish `ACTIONABLE`, `WAIT`, `INSUFFICIENT_EVIDENCE`, and `REJECTED`. The evidence package records dataset content/slice identities, analysis and visible-prefix identities, exact definitions and evaluation identity, source evidence references, risk configuration/request/result identities, and execution assumptions. The layer is research output only: it has no LLM, API, persistence, broker, paper-trading, or live-execution functionality. The prior committed roadmap assigned Phase 2H to risk; this subsequent candidate layer is numbered Phase 2I.
 
 ## Run with Docker Compose
 
