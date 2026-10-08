@@ -1,10 +1,10 @@
 # Trading Agent
 
-This repository is the foundation of an AI trading research platform. It provides a minimal FastAPI service, PostgreSQL connection setup, Alembic migration configuration, local document ingestion, deterministic market analysis, and deterministic setup evaluation. **Trading execution and performance validation have not been implemented.**
+This repository is the foundation of an AI trading research platform. It provides a minimal FastAPI service, PostgreSQL connection setup, Alembic migration configuration, local document ingestion and retrieval, deterministic market analysis and setup evaluation, an in-process historical backtesting foundation, and an independent deterministic risk calculator. **These research foundations do not establish profitable performance; trading execution has not been implemented.**
 
 ## Development stage
 
-Phase 1, Phase 2A (local knowledge ingestion), Phase 2B (embeddings and semantic retrieval), Phase 2C (lexical/hybrid retrieval and evaluation), Phase 2D (deterministic market-data/context foundations), Phase 2E (deterministic market analysis), and Phase 2F (deterministic strategy/setup definition and evaluation) are implemented. Backtesting, signals, risk controls, and trading capabilities are not implemented.
+Phases 1 and 2A–2H are implemented as foundations: knowledge ingestion/retrieval, market data/context, deterministic analysis and strategy evaluation, in-process backtesting, and independent risk calculations. Backtesting and risk calculations are limited research components, not evidence of strategy performance or trading readiness. No broker integration, order execution, paper trading, or live trading is implemented.
 
 ## Technology stack
 
@@ -12,7 +12,7 @@ Python 3.12+, FastAPI, PostgreSQL with pgvector, SQLAlchemy 2.x, Alembic, FastEm
 
 ## Project structure
 
-- `backend/app` — API, configuration, database setup, SQLAlchemy models, embeddings, knowledge, market-data/context, deterministic market-analysis, and in-memory strategy evaluation.
+- `backend/app` — API, configuration, database setup, SQLAlchemy models, embeddings, knowledge, market-data/context, deterministic market analysis and strategy evaluation, backtesting, and risk calculation.
 - `backend/app/knowledge` — local text, Markdown, and PDF loading, cleaning, chunking, JSON output, embedding ingestion, and retrieval.
 - `backend/tests` — deterministic unit tests plus gated PostgreSQL integration tests.
 - `backend/alembic` — migration environment, pgvector/retrieval schema, and market-data schema migrations.
@@ -87,9 +87,9 @@ The report provides per-query failure details and Recall@K, Precision@K, Hit Rat
 
 ## Market-data foundation (Phase 2D)
 
-Phase 2D defines typed instruments, canonical timeframes, UTC-aware BAR-OPEN candles, provider contracts, normalization and quality reports, immutable dataset snapshots, explicit dataset-scoped range queries, and configurable timezone-aware session labels. A deterministic in-memory fixture provider is included; no external provider, market-data API route, or network download is implemented. Daily/weekly nominal durations do not determine exchange boundaries. Generic Asia/London/New York windows are configurable examples, not broker or exchange hours; without an explicit market calendar, trading status remains unknown.
+Phase 2D defines typed instruments, canonical timeframes, UTC-aware BAR-OPEN candles, provider contracts, normalization and quality reports, versioned dataset snapshots with repository/service-enforced immutability, explicit dataset-scoped range queries, and configurable timezone-aware session labels. A deterministic in-memory fixture provider is included; no external provider, market-data API route, or network download is implemented. Daily/weekly nominal durations do not determine exchange boundaries. Generic Asia/London/New York windows are configurable examples, not broker or exchange hours; without an explicit market calendar, trading status remains unknown.
 
-PostgreSQL is the intended persistence backend. Phase 2D unit and static checks pass, but live PostgreSQL migration and persistence/range-query behavior have not been verified locally because a migrated Phase 2D PostgreSQL test database is unavailable and the Windows environment restricts the psycopg binary. SQLite checks do not validate PostgreSQL-specific behavior. The gated test module can be enabled with `MARKET_DATA_TEST_DATABASE_URL` pointing to a PostgreSQL database already migrated to head; it performs no migrations itself.
+PostgreSQL is the intended persistence backend. Dataset immutability is enforced by repository/service operations; the schema does not add database triggers or constraints preventing direct updates/deletes. Phase 2D unit and static checks pass, but live PostgreSQL migration and persistence/range-query behavior have not been verified locally because a migrated Phase 2D PostgreSQL test database is unavailable and the Windows environment restricts the psycopg binary. SQLite checks do not validate PostgreSQL-specific behavior. The gated test module can be enabled with `MARKET_DATA_TEST_DATABASE_URL` pointing to a PostgreSQL database already migrated to head; it performs no migrations itself.
 
 ## Deterministic market analysis (Phase 2E)
 
@@ -103,7 +103,19 @@ Phase 2E adds no database schema or migration, external dependencies, strategies
 
 `backend/app/strategy` defines immutable, explicitly versioned strategy/setup contracts and evaluates their typed conditions against a supplied Phase 2E `AnalysisResult`. Evaluation uses three-valued logic, provenance-linked evidence, deterministic lifecycle transitions, exact UTC observation cutoffs, and SHA-256 fingerprints. The first supplied observation is left-censored: an already-true qualifying condition cannot create a candidate until a prior supplied observation establishes it was false. Phase 2F verifies the full Phase 2E fingerprint and separately derives a cutoff-visible prefix identity; full provenance is retained while future suffixes do not alter the decision fingerprint. It is a pure in-memory evaluation layer: it does not query datasets or persist definitions/results.
 
-Phase 2F defines and evaluates deterministic setups. It does not establish setup quality or trading performance. Backtesting, walk-forward validation, Monte Carlo, a risk engine, position sizing, stop-loss/take-profit management, broker integration, paper trading, live execution, LLM reasoning, RAG, persistence, and strategy API routes remain future work. Phase 2F has no migration or dependency changes.
+Phase 2F defines and evaluates deterministic setups but does not establish setup quality or trading performance. Phases 2G/2H add limited backtest and single-trade risk foundations below. Walk-forward validation, Monte Carlo, portfolio controls, stop-loss/take-profit lifecycle management, broker integration, paper trading, live execution, LLM reasoning, RAG, persistence, and strategy/risk API routes remain future work. Phase 2F itself has no migration or dependency changes.
+
+## Historical backtesting foundation (Phase 2G)
+
+`backend/app/backtesting` replays a supplied Phase 2E analysis result and Phase 2F strategy/setup over an explicit UTC range. It checks dataset, analysis, strategy, setup, and provenance identities; evaluates lifecycle transitions once and replays them chronologically; and models entries/exits at the next primary bar-open with explicit fixed quantity, spread, slippage, and fees. The shared `backend/app/execution` contract contains assumptions only; it does not integrate with brokers. There are no intrabar stop/target rules, dynamic position sizing, optimization, walk-forward validation, broker integration, or persistence. An open position at the cutoff remains open; ending equity includes a conservative mark-to-market at the last closed candle with the configured assumed exit costs, while closed-trade metrics remain separate. Maximum drawdown uses closed-trade outcomes, not intratrade marks.
+
+This is a deterministic simulation foundation, not a validated performance report. It does not establish fill realism, predictive value, or profitability. PostgreSQL is not used by the backtest engine; its source `AnalysisResult` must be supplied by the caller.
+
+## Deterministic risk calculation (Phase 2H)
+
+`backend/app/risk` evaluates an explicit trade proposal against immutable risk configuration using Decimal arithmetic. It requires a supplied positive PnL-to-account-currency conversion rate, includes modeled execution costs in downside sizing, rounds quantity down to the configured increment, and returns `RISK_VALID`, `RISK_REJECTED`, or `INSUFFICIENT_EVIDENCE` with a request-bound fingerprint. The engine does not select trades, create stops/targets, integrate with a broker, persist decisions, or authorize execution. Configuration and conversion inputs are caller-supplied evidence; this module does not fetch exchange rates or verify their source.
+
+The Phase 2H calculator is not portfolio risk management: it does not model leverage/margin, correlated exposure, daily or weekly loss limits, drawdown controls, or dynamic account equity. A valid calculation only means the supplied inputs satisfy the implemented single-trade checks; it does not mean a trade is suitable or profitable.
 
 ## Run with Docker Compose
 

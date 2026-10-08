@@ -237,7 +237,7 @@ class MarketDataSlice(MarketDataModel):
 
 class MarketDatasetManifest(MarketDataModel):
     dataset_id: UUID
-    dataset_version: int = Field(ge=1)
+    dataset_version: int = Field(ge=1, strict=True)
     instrument: Instrument
     timeframe: Timeframe
     provider_id: str

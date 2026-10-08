@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 
 from app.market_analysis.contracts import (
-    ANALYSIS_VERSION, AnalysisParameters, AnalysisRequest, ConfirmedSwing, DatasetRef,
+    ANALYSIS_VERSION, AnalysisParameters, AnalysisRequest, ConfirmedSwing, DatasetProvenance, DatasetRef,
     StructuralState, SwingKind,
 )
 from app.market_analysis.errors import AnalysisCutoffError, AnalysisDataError
@@ -151,6 +151,21 @@ def test_dataset_version_requires_a_strict_positive_integer(version):
 def test_dataset_version_accepts_positive_integer():
     assert DatasetRef(dataset_id=uuid4(), dataset_version=1,
                       instrument=INSTRUMENT, timeframe=Timeframe.M1).dataset_version == 1
+
+
+@pytest.mark.parametrize("version", [True, False, 0, -1, "1", 1.5, 1.0])
+def test_persisted_dataset_and_provenance_versions_are_strict(version):
+    valid_dataset = dataset((candle(0, 12, 9, 11),), uuid4())
+    manifest_payload = valid_dataset.manifest.model_dump(mode="python")
+    manifest_payload["dataset_version"] = version
+    with pytest.raises(ValueError):
+        MarketDatasetManifest.model_validate(manifest_payload)
+
+    provenance = DatasetProvenance.from_manifest(valid_dataset.manifest)
+    provenance_payload = provenance.model_dump(mode="python")
+    provenance_payload["dataset_version"] = version
+    with pytest.raises(ValueError):
+        DatasetProvenance.model_validate(provenance_payload)
 
 
 class FakeRepository:

@@ -1,7 +1,7 @@
 # Trading-Agent Master Engineering Specification
 
 **Status:** Master requirements for future development  
-**Current implementation:** Foundation, Phase 2A ingestion, Phase 2B embeddings/semantic retrieval, Phase 2C lexical/hybrid retrieval/evaluation, Phase 2D market-data/context foundations, Phase 2E deterministic market analysis, and Phase 2F deterministic strategy/setup definition and evaluation
+**Current implementation:** Foundation, Phase 2A ingestion, Phase 2B embeddings/semantic retrieval, Phase 2C lexical/hybrid retrieval/evaluation, Phase 2D market-data/context foundations, Phase 2E deterministic market analysis, Phase 2F deterministic strategy/setup evaluation, Phase 2G in-process backtesting foundation, and Phase 2H single-trade risk calculation
 
 This document is the technical contract for future Trading-Agent work. New designs, implementation prompts, and phase proposals must follow these requirements or explicitly document a justified change to this specification. Requirements for future components describe intended behavior; they do not imply those components exist today.
 
@@ -113,7 +113,7 @@ Before use by analysis, strategy evaluation, or backtesting, data must be checke
 
 Missing or invalid data must never be silently fabricated or filled. Any permitted normalization or gap treatment must be explicit, justified for the data type, recorded, and tested. Data that fails validation must be rejected, quarantined, or clearly marked unavailable to downstream components. Real-time and historical sources must preserve timestamps that distinguish event time from receipt or processing time.
 
-Phase 2D implements the historical data foundation using typed UTC BAR-OPEN candles, explicit provider metadata, deterministic normalization/quality checks, and immutable PostgreSQL dataset snapshots. Its local fixture provider does not retrieve real markets. Live PostgreSQL validation remains pending in the current Windows environment; SQLite must not be treated as validating PostgreSQL-specific behavior. Session labels are configurable context, not exchange calendars or strategy rules.
+Phase 2D implements the historical data foundation using typed UTC BAR-OPEN candles, explicit provider metadata, deterministic normalization/quality checks, and PostgreSQL dataset snapshots. Dataset immutability is enforced through repository/service operations, not database triggers or constraints; direct database writes can bypass the policy. Its local fixture provider does not retrieve real markets. Live PostgreSQL validation remains pending in the current Windows environment; SQLite must not be treated as validating PostgreSQL-specific behavior. Session labels are configurable context, not exchange calendars or strategy rules.
 
 ### Phase 2E deterministic analysis requirements
 
@@ -125,7 +125,15 @@ Canonical timestamps denote BAR-OPEN. A fixed-duration candle becomes knowable a
 
 Phase 2F defines immutable, explicitly versioned strategy and setup definitions and evaluates typed conditions against a supplied Phase 2E `AnalysisResult`. The evaluator uses a closed field allowlist, strict declared parameters, three-valued condition logic, provenance-linked evidence, deterministic lifecycle transitions, exact observation-time cutoffs, and reproducible fingerprints. It verifies Phase 2E's full-result fingerprint and also derives a separate evaluation-visible prefix identity. The first observation is left-censored; a candidate starts only after the qualifying activation is observed false and then true within the supplied analysis range. Evaluation does not invent lifecycle state before that range, fetch data, persist state, or expose an API.
 
-Phase 2F defines and evaluates deterministic setups; it does not establish predictive value or trading performance. Historical backtesting, walk-forward validation, Monte Carlo, risk, position sizing, stop-loss/take-profit, broker integration, paper trading, live execution, LLM reasoning, RAG, persistence, and API routes remain future work.
+Phase 2F defines and evaluates deterministic setups; it does not establish predictive value or trading performance. Phases 2G and 2H add limited backtest and single-trade risk foundations below. Walk-forward validation, Monte Carlo, portfolio risk, broker integration, paper trading, live execution, LLM reasoning, RAG, persistence, and API routes remain future work.
+
+### Phase 2G historical backtesting foundation
+
+Phase 2G replays supplied Phase 2E analysis and Phase 2F setup definitions over a bounded UTC range. The in-process engine checks dataset, strategy/setup, provenance, analysis, and visible-prefix identity, evaluates observations chronologically, and models fixed-quantity entries/exits at the next primary bar-open with explicit spread, slippage, and fees. It does not infer intrabar ordering, stops/targets, dynamic sizing, or fill liquidity. An open trade is marked using the last closed candle and the configured assumed exit costs for ending-equity reporting; closed-trade metrics are separate. The result is deterministic research output, not evidence of profitability. Persistence, walk-forward/out-of-sample validation, optimization, broker integration, paper trading, and live execution remain unimplemented.
+
+### Phase 2H deterministic single-trade risk calculation
+
+Phase 2H evaluates explicit trade inputs against risk configuration using Decimal arithmetic, a caller-supplied PnL-to-account-currency conversion rate, execution-cost estimates, quantity rounding, and configured single-trade limits. It returns valid, rejected, or insufficient-evidence status with request-bound provenance/fingerprints. It does not obtain or validate the conversion-rate source, select a trade, create stops/targets, manage a portfolio, model leverage/margin or aggregate loss limits, persist results, or authorize execution. A valid result is not an endorsement or a performance claim.
 
 ## 6. Market context
 
@@ -267,6 +275,6 @@ Success is not “the AI predicts the market correctly.” No architecture can g
 
 ## 22. Current implementation boundary
 
-The current project contains the FastAPI/PostgreSQL foundation, Phase 2A local knowledge ingestion for TXT, Markdown, and text-based PDF documents, Phase 2B/2C source-linked retrieval, the Phase 2D market-data/context foundation, the Phase 2E deterministic market-analysis foundation, and the Phase 2F deterministic strategy/setup definition and evaluation foundation. These capabilities do not establish predictive value or trading performance.
+The current project contains the FastAPI/PostgreSQL foundation, Phase 2A local knowledge ingestion for TXT, Markdown, and text-based PDF documents, Phase 2B/2C source-linked retrieval, the Phase 2D market-data/context foundation, the Phase 2E deterministic market-analysis foundation, the Phase 2F deterministic strategy/setup foundation, the Phase 2G backtesting foundation, and the Phase 2H single-trade risk calculator. These capabilities do not establish predictive value or trading performance.
 
-The current project includes Phase 1 foundations, Phase 2A local ingestion, Phase 2B local embeddings and semantic retrieval, Phase 2C PostgreSQL lexical/hybrid retrieval with a bootstrap evaluation harness, Phase 2D deterministic market-data/context foundations with an in-memory fixture provider, Phase 2E deterministic in-memory market analysis, and Phase 2F in-memory deterministic setup evaluation. Phase 2D live PostgreSQL validation remains pending; its gated PostgreSQL integration tests require a migrated test database. The project does not implement external market-data providers, expanded analysis indicators, signals, a risk engine, backtesting, ML models, broker APIs, trading execution, a frontend, or authentication. Those remain future work subject to their own scope and validation.
+The current project includes Phase 1 foundations, Phase 2A local ingestion, Phase 2B local embeddings and semantic retrieval, Phase 2C PostgreSQL lexical/hybrid retrieval with a bootstrap evaluation harness, Phase 2D deterministic market-data/context foundations with an in-memory fixture provider, Phase 2E deterministic in-memory market analysis, Phase 2F in-memory deterministic setup evaluation, Phase 2G in-process backtesting, and Phase 2H a single-trade deterministic risk calculator. Phase 2D live PostgreSQL validation remains pending; its gated PostgreSQL integration tests require a migrated test database. The project does not implement external market-data providers, expanded analysis indicators, portfolio risk, walk-forward/out-of-sample validation, ML models, broker APIs, trading execution, a frontend, or authentication. Those remain future work subject to their own scope and validation.

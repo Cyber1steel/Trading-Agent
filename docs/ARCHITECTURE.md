@@ -4,7 +4,7 @@ The project-wide engineering contract for future architecture and implementation
 
 ## Current foundation
 
-The current system is a small FastAPI service. Its API routes live separately from application configuration and database infrastructure. SQLAlchemy provides a PostgreSQL engine and session factory; Alembic manages the application schema. Phase 2F adds deterministic in-memory setup evaluation; signals, risk decisions, trade simulation, and execution do not exist.
+The current system is a small FastAPI service. Its API routes live separately from application configuration and database infrastructure. SQLAlchemy provides a PostgreSQL engine and session factory; Alembic manages the application schema. Phases 2G and 2H add in-process backtesting and deterministic risk calculations. They do not add public routes, persistence, broker integration, paper trading, or live execution.
 
 ## Knowledge ingestion (Phase 2A)
 
@@ -50,7 +50,7 @@ Canonical candles use `Decimal` OHLCV, an aware UTC BAR-OPEN timestamp, and opti
 
 Normalization validates request identity and `[start, end)` bounds, timestamps, ordering, duplicates, OHLC/volume and quote relationships. It does not sort, drop, repair, or fill rows. Hard issues prevent persistence; warnings such as zero-volume anomalies, candidate gaps without an authoritative calendar, and unknown completeness stay on the dataset report. A supplied completeness policy can make missing expected bars hard failures. Naive timestamps and invalid typed values are rejected; aware instants are normalized to UTC.
 
-PostgreSQL stores instruments, immutable dataset manifests, and candles. Dataset IDs and versions are selected explicitly for range queries; no mutable latest-dataset selection or cross-dataset merging occurs. The manifest records provider/version, request, retrieval/ingestion times, conventions, normalization/validation versions, quality summary, and a deterministic hash of normalized candle content. Session definitions use IANA timezones through `zoneinfo`, support overlaps and weekday windows, and label weekends independently. Generic Asia/London/New York examples are not trading-hour truth; absent an explicit calendar, calendar status is unknown and holidays are not inferred.
+PostgreSQL stores instruments, dataset manifests, and candles. Dataset immutability is enforced by repository/service operations, not database triggers or constraints; direct SQL writes can bypass that policy. Dataset IDs and versions are selected explicitly for range queries; no mutable latest-dataset selection or cross-dataset merging occurs. The manifest records provider/version, request, retrieval/ingestion times, conventions, normalization/validation versions, quality summary, and a deterministic hash of normalized candle content. Session definitions use IANA timezones through `zoneinfo`, support overlaps and weekday windows, and label weekends independently. Generic Asia/London/New York examples are not trading-hour truth; absent an explicit calendar, calendar status is unknown and holidays are not inferred.
 
 **Validation status:** Phase 2D unit tests and Python/static/offline checks pass. Live PostgreSQL migration and retrieval execution have not been verified in the current Windows environment because a migrated Phase 2D test database is unavailable and the local psycopg binary is restricted. SQLite is not evidence for PostgreSQL `NUMERIC`, timezone, constraint, or index behavior. Gated tests in `backend/tests/test_market_data_integration.py` should be run against a PostgreSQL database already migrated to head (`MARKET_DATA_TEST_DATABASE_URL`). This is a validation limitation, not evidence that the implementation is broken.
 
@@ -70,22 +70,31 @@ Phase 2E has no database schema or migration changes and adds no strategy, signa
 
 `backend/app/strategy` consumes a caller-supplied Phase 2E `AnalysisResult` and exact, immutable strategy/setup versions. Its closed condition model supports typed comparisons and AND/OR/NOT with `TRUE`, `FALSE`, or `INSUFFICIENT` outcomes. The pure evaluator replays eligible primary observations, applies explicit candidate/confirmation/invalidation/expiry ordering, emits provenance references and lifecycle transitions, and fingerprints definitions and evaluation output. Higher-timeframe values are guarded by parent-close and event-known-at checks. The evaluator recomputes and verifies the full Phase 2E result identity, then derives an evaluation-visible prefix identity from inputs and observations known by the requested time. Full analysis identity remains in the result and evidence; the decision digest binds the prefix, so an unchanged visible prefix is invariant to future suffix changes. The first supplied observation is left-censored: candidate creation requires a prior supplied observation where the combined prerequisite/context and entry activation was false, followed by a true activation. The evaluator has no repository, filesystem, network, database, or clock access.
 
-Lifecycle ordering is explicit: evaluate current prerequisites/context, invalidate an existing candidate or confirmed setup, apply candidate expiry, evaluate confirmation, then create a new candidate. Expiry is measured in later primary observations: the entry observation is observation zero, and the candidate expires when the count of later observations reaches `max_later_observations`; expiry wins over confirmation on that boundary. Invalidation wins over expiry when both become true on the same observation. Phase 2F defines and evaluates deterministic setups. It does not validate profitability or simulate trades. Backtesting, walk-forward validation, Monte Carlo, risk, position sizing, SL/TP, broker integration, paper/live execution, LLM/RAG, persistence, and API routes remain future work. Phase 2F introduces no database schema or dependency. Runtime validation for this phase is reported separately from the Phase 2E validation above.
+Lifecycle ordering is explicit: evaluate current prerequisites/context, invalidate an existing candidate or confirmed setup, apply candidate expiry, evaluate confirmation, then create a new candidate. Expiry is measured in later primary observations: the entry observation is observation zero, and the candidate expires when the count of later observations reaches `max_later_observations`; expiry wins over confirmation on that boundary. Invalidation wins over expiry when both become true on the same observation. Phase 2F defines and evaluates deterministic setups. It does not validate profitability. Phases 2G and 2H provide limited in-process backtesting and single-trade risk calculations, described below; walk-forward validation, portfolio risk, persistence, and API routes remain future work. Phase 2F introduces no database schema or dependency.
 
 ## Future components
 
-These are architectural directions only; they are not implemented:
+These are architectural directions only; they are not implemented unless noted otherwise:
 
 - **Web/YouTube/podcast ingestion** — future source adapters; Phase 2C implemented retrieval and evaluation, not external source downloading or scraping.
 - **Market-data integrations** — external historical providers and live feeds beyond the Phase 2D fixture/provider boundary.
 - **Expanded analysis** — indicators and analysis beyond the deterministic Phase 2E foundation.
-- **Historical strategy validation** — backtesting and walk-forward evaluation of Phase 2F definitions.
-- **Risk** — risk controls and position sizing research.
+- **Expanded historical validation** — walk-forward, out-of-sample, robustness, and Monte Carlo evaluation beyond the Phase 2G foundation.
+- **Portfolio risk** — portfolio-level controls beyond the Phase 2H single-trade calculator.
 - **Agent** — language model assisted research workflows.
 - **Decision Engine** — explicit orchestration of research outputs.
-- **Backtesting** — historical strategy evaluation.
+
+## Backtesting (Phase 2G)
+
+Phase 2G provides a deterministic in-process replay of supplied Phase 2E analysis and Phase 2F setup definitions. It validates dataset, provenance, strategy/setup, full-analysis, and cutoff-prefix identities, evaluates lifecycle transitions once and replays them chronologically, and applies explicit fixed-quantity spread, slippage, and fee assumptions. The shared assumptions contract lives in `app.execution`; it does not provide broker functionality. Entries and exits execute at the next primary bar-open; no intrabar stop/target ordering is inferred. An open position at the cutoff remains open and is marked conservatively at the last closed candle with assumed exit costs for ending-equity reporting; closed-trade metrics remain separate. Results include transition evidence, a deterministic fingerprint, and immutable event/trade records. This is not full market-fill simulation, is not persisted, does not perform walk-forward or out-of-sample evaluation, and does not establish profitability. Maximum drawdown is computed from closed-trade outcomes only, not intratrade mark-to-market equity.
 - **Chat Analysis** — analysis of messages and signals.
 - **Journal** — records of research and simulated decisions.
 - **Frontend** — a dashboard for research workflows.
+
+## Deterministic risk engine (Phase 2H)
+
+Phase 2H adds a fail-closed, deterministic single-trade risk calculator. It accepts explicit trade inputs, account equity, a supplied PnL-to-account-currency conversion rate, stop and optional target prices, and the shared `app.execution` assumptions contract. It calculates risk budget, rounded-down quantity, stop distance, reward/risk, exposure, estimated costs, and downside using Decimal arithmetic. It distinguishes insufficient evidence from explicit rule rejections and does not invent missing values.
+
+The risk engine is intentionally independent from LLM reasoning and strategy selection. It does not decide whether a strategy is profitable; it checks whether supplied inputs satisfy the implemented single-trade limits. The caller-provided conversion rate is not externally validated, and the service does not model portfolio exposure, leverage/margin, daily/weekly loss, or drawdown limits. Phase 2H is not connected to the backtester or any execution system.
 
 Future components should be added as focused modules when their requirements are defined. The platform is intended to begin as research and analysis software, not an execution system.

@@ -40,7 +40,7 @@ class RetrievalEvaluationCase(BaseModel):
 
 class RetrievalEvaluationDataset(BaseModel):
     dataset_id: str
-    version: int = Field(ge=1)
+    version: int = Field(ge=1, strict=True)
     cases: list[RetrievalEvaluationCase] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -108,7 +108,7 @@ class EvaluationAggregate(BaseModel):
 
 class RetrievalEvaluationReport(BaseModel):
     dataset_id: str
-    dataset_version: int
+    dataset_version: int = Field(ge=1, strict=True)
     retrieval_mode: RetrievalMode
     ks: list[int]
     cases: list[EvaluationCaseReport]

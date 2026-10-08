@@ -145,7 +145,7 @@ class ConfirmedSwing(MarketDataModel):
 
 class DatasetProvenance(MarketDataModel):
     dataset_id: UUID
-    dataset_version: int
+    dataset_version: int = Field(ge=1, strict=True)
     instrument: Instrument
     timeframe: Timeframe
     content_hash: str

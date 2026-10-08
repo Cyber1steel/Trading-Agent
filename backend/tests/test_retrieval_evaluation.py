@@ -54,6 +54,15 @@ def dataset() -> RetrievalEvaluationDataset:
     )
 
 
+@pytest.mark.parametrize("version", [True, False, 0, -1, "1", 1.0])
+def test_evaluation_dataset_version_is_strict_positive_integer(version):
+    with pytest.raises(ValueError):
+        RetrievalEvaluationDataset(
+            dataset_id="unit-test", version=version,
+            cases=[RetrievalEvaluationCase(case_id="case", query="query", expected_chunk_ids=["chunk"])],
+        )
+
+
 def test_evaluation_metrics_and_case_failure_analysis():
     report = evaluate_rankings(
         dataset(),
