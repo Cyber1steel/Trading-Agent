@@ -4,11 +4,11 @@ This repository is the foundation of an AI trading research platform. It provide
 
 ## Development stage
 
-Phases 1, 2A–2I, and 3A–3B are implemented as foundations: knowledge ingestion/retrieval, market data/context, deterministic analysis and strategy evaluation, in-process backtesting, independent risk calculations, deterministic candidate/evidence assembly, an evidence-bound reasoning boundary, and offline adversarial reasoning evaluation. These are limited research components, not evidence of strategy performance or trading readiness. No broker integration, order execution, paper trading, or live trading is implemented. The repository previously used Phase 2H for the risk engine; the candidate/evidence foundation therefore follows it as Phase 2I to preserve the committed phase history.
+Phases 1, 2A–2I, and 3A–3C are implemented as foundations: knowledge ingestion/retrieval, market data/context, deterministic analysis and strategy evaluation, in-process backtesting, independent risk calculations, deterministic candidate/evidence assembly, an evidence-bound reasoning boundary, offline adversarial evaluation, and an optional real-provider adapter. Live provider behavior is not yet verified because no credential is configured. These are limited research components, not evidence of strategy performance or trading readiness. No broker integration, order execution, paper trading, or live trading is implemented. The repository previously used Phase 2H for the risk engine; the candidate/evidence foundation therefore follows it as Phase 2I to preserve the committed phase history.
 
 ## Technology stack
 
-Python 3.12+, FastAPI, PostgreSQL with pgvector, SQLAlchemy 2.x, Alembic, FastEmbed, Pydantic Settings, pypdf, pytest, Docker, and Docker Compose.
+Python 3.12+, FastAPI, PostgreSQL with pgvector, SQLAlchemy 2.x, Alembic, FastEmbed, Pydantic Settings, pypdf, pytest, the optional OpenAI Python SDK provider adapter, Docker, and Docker Compose.
 
 ## Project structure
 
@@ -129,7 +129,7 @@ Candidates and evidence packages are frozen, nested immutable contracts with det
 
 The evidence hierarchy is explicit: deterministic market observations; deterministic strategy/risk and candidate evidence; historical backtest evidence; retrieved educational/reference knowledge; and LLM inference. Historical backtest evidence includes dataset, strategy/setup, analysis, request, execution assumptions, engine version, sample counts, metrics, warnings, and an explicit `NOT_ESTABLISHED` out-of-sample state. It is historical simulation, not a forecast or proof of profitability.
 
-Providers implement a small protocol returning raw structured JSON and provider/model/request metadata. There is no vendor SDK, API key requirement, default live provider, or network dependency. The core validates structured output, evidence and knowledge citations, cited numerical values, status semantics, and unsupported future-profitability language before creating a result. Malformed responses, provider errors/timeouts, and unsupported claims produce an auditable `INSUFFICIENT_EVIDENCE` result. Deterministic `REJECTED`, `WAIT`, and `INSUFFICIENT_EVIDENCE` states cannot be promoted by a provider. Results preserve deterministic candidate status separately, contain no mutable candidate fields, and are fingerprinted with the context, question, prompt contract, provider/model, citations, response hash, and output.
+Providers implement a small protocol returning raw structured JSON and provider/model/request metadata. Phase 3A introduced the protocol without a vendor SDK or live provider. Phase 3C adds an optional OpenAI Responses API adapter using structured Pydantic output. The SDK and client are loaded only when the adapter is called, and API credentials are optional for application import/startup. The core still independently validates provider output, evidence and knowledge citations, cited numerical values, status semantics, and unsupported future-profitability language before creating a result. Malformed responses, provider errors/timeouts, and unsupported claims produce an auditable `INSUFFICIENT_EVIDENCE` result. Deterministic `REJECTED`, `WAIT`, and `INSUFFICIENT_EVIDENCE` states cannot be promoted by a provider. Results preserve deterministic candidate status separately, contain no mutable candidate fields, and are fingerprinted with the context, question, prompt contract, provider/model, citations, response hash, and output; operational latency/token telemetry is retained separately and excluded from the deterministic fingerprint.
 
 Phase 3A is an explanation and evidence-orchestration foundation only. It adds no API route, persistence, autonomous agent loop, reranker, strategy/signal generation, risk calculation, or execution capability. Free-form language is not a complete semantic fact checker; structured citations and numerical claims receive deterministic validation, while broader natural-language truth still requires human review. Source publication time does not establish when a local knowledge corpus was indexed, so this phase does not claim a knowledge source was present in the system at a historical decision time. The implementation does not establish strategy quality, future profitability, or trading readiness.
 
@@ -138,6 +138,18 @@ Phase 3A is an explanation and evidence-orchestration foundation only. It adds n
 The offline scenario runner at `backend/app/reasoning/evaluation.py` exercises the real reasoning service with 13 immutable, reusable golden/adversarial cases and a simulated provider. The cases cover valid ACTIONABLE, WAIT, INSUFFICIENT_EVIDENCE, and REJECTED states; attacks cover risk/execution overrides, fabricated evidence and metrics, temporal leakage, malicious instructions inside retrieved documents, contradictory evidence, altered provenance, and provider failures. It reports safety-boundary counts rather than “AI accuracy.” Defined numeric, future-performance, override, citation, context-integrity, and response-size checks fail closed; deterministic WAIT/REJECTED/INSUFFICIENT_EVIDENCE does not invoke a provider. Retrieved passages are explicitly treated as untrusted content, never as instructions.
 
 These checks validate only the specified attack classes. They do not prove the reasoning layer is hallucination-proof, fully fact-check arbitrary prose, calibrate model confidence, or predict trading profitability. Context fingerprints detect stale/inconsistent content but are unkeyed hashes, not authentication against a hostile caller that can fabricate and re-hash all inputs; source authenticity remains with trusted upstream artifact and retrieval producers. Evaluation runs offline with no paid model/API. Live provider behavior, strategy quality, out-of-sample performance, and profitability remain unverified.
+
+## Real reasoning provider integration (Phase 3C)
+
+The configured production adapter is OpenAI Responses API. Set `OPENAI_API_KEY` and, optionally, `REASONING_MODEL`, `REASONING_TIMEOUT_SECONDS`, `REASONING_MAX_INPUT_BYTES`, `REASONING_MAX_OUTPUT_TOKENS`, `REASONING_MAX_RETRIES`, and `REASONING_EFFORT` in the untracked `backend/.env`. The default is zero retries, bounded input/output and timeout, and `store=false`; a custom base URL must use HTTPS except for localhost. Provider calls are not made during import or API startup. Deterministic non-actionable candidates bypass provider calls.
+
+Run the versioned 13-case Phase 3B dataset against a real model only with explicit cost confirmation:
+
+```powershell
+python backend/scripts/evaluate_reasoning_provider.py --confirm-live-cost
+```
+
+The report includes dataset identity, per-case boundary outcome, provider/model and available token/latency telemetry. If credentials are absent, the script reports `SKIPPED` and makes no request. A live run is a bounded plumbing/safety check, not a profitability or general model-quality evaluation. In the current development environment no OpenAI credential is configured, so real-model behavior has not been evaluated; offline adapter tests use a stub client and make no network calls.
 
 ## Run with Docker Compose
 

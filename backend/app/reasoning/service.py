@@ -88,6 +88,15 @@ class ReasoningService:
                 raise ProviderError("provider request metadata is malformed")
             if tuple(sorted(reply.request_metadata)) != reply.request_metadata:
                 raise ProviderError("provider metadata must be a deterministically ordered tuple")
+            if type(reply.telemetry) is not tuple or any(
+                type(entry) is not tuple or len(entry) != 2 for entry in reply.telemetry
+            ):
+                raise ProviderError("provider telemetry is malformed")
+            if any(
+                type(key) is not str or (type(value) not in (str, int, float, bool) and value is not None)
+                for key, value in reply.telemetry
+            ) or len({entry[0] for entry in reply.telemetry}) != len(reply.telemetry):
+                raise ProviderError("provider telemetry is malformed")
             metadata = dict(reply.request_metadata)
             proposal = ReasoningProposal.model_validate_json(reply.raw_response)
             validate_proposal(proposal, context)
@@ -107,6 +116,7 @@ class ReasoningService:
                 provider_id=reply.provider_id,
                 model_id=reply.model_id,
                 metadata=metadata,
+                telemetry=dict(reply.telemetry),
                 provider_response_sha256=self._response_hash(reply),
                 failure_code=None,
             )
@@ -136,7 +146,8 @@ class ReasoningService:
     def _result(
         self, request, *, status, conclusion, uncertainty, explanation,
         supporting=(), contradicting=(), missing=(), assumptions=(), risks=(), limitations=(),
-        knowledge_ids=(), provider_id, model_id, metadata=None, provider_response_sha256=None, failure_code,
+        knowledge_ids=(), provider_id, model_id, metadata=None, telemetry=None,
+        provider_response_sha256=None, failure_code,
     ):
         context = request.context
         knowledge = {item.evidence_id: item for item in context.knowledge}
@@ -164,6 +175,7 @@ class ReasoningService:
             "question": request.question,
             "provider_response_sha256": provider_response_sha256,
             "request_metadata": metadata or {},
+            "provider_telemetry": telemetry or {},
             "failure_code": failure_code,
         }
         return ReasoningResult(**fields, fingerprint=result_fingerprint(fields))

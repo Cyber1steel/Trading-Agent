@@ -27,3 +27,11 @@ class ProviderUnavailable(ProviderError):
 
 class ProviderContextTooLarge(ProviderError):
     """The provider rejected the prompt for exceeding context limits."""
+
+
+class ProviderRateLimited(ProviderError):
+    """The provider rejected the request due to rate or quota limits."""
+
+
+class ProviderAuthenticationError(ProviderError):
+    """The provider rejected configured credentials."""

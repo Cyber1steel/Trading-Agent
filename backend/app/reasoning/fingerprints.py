@@ -59,4 +59,6 @@ def context_fingerprint(context) -> str:
 
 
 def result_fingerprint(result_fields: dict) -> str:
-    return digest(result_fields, domain="reasoning-result")
+    # Operational telemetry (latency/token counts) is intentionally outside deterministic identity.
+    stable_fields = {key: value for key, value in result_fields.items() if key != "provider_telemetry"}
+    return digest(stable_fields, domain="reasoning-result")

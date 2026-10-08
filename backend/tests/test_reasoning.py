@@ -279,6 +279,10 @@ def test_provider_valid_result_is_structured_auditable_and_repeatable():
     assert result.candidate_fingerprint == context.candidate.candidate_fingerprint
     assert result.knowledge_references[0].source_id == "source-1"
     assert result.fingerprint == repeat.fingerprint
+    telemetry_variant = result.model_dump(mode="python", exclude={"fingerprint"})
+    telemetry_variant["provider_telemetry"] = {"latency_ms": 123, "total_tokens": 45}
+    from app.reasoning.fingerprints import result_fingerprint
+    assert result_fingerprint(telemetry_variant) == result.fingerprint
     assert provider.prompt.contract_version
     with pytest.raises((ValidationError, TypeError)):
         result.request_metadata["new"] = "value"

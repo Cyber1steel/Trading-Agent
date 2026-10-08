@@ -496,12 +496,16 @@ class ReasoningResult(MarketDataModel):
     question: str
     provider_response_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     request_metadata: dict[str, str | int | bool | None]
+    provider_telemetry: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
     failure_code: str | None = None
     fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
 
-    @field_validator("request_metadata", mode="after")
+    @field_validator("request_metadata", "provider_telemetry", mode="after")
     @classmethod
     def freeze_metadata(cls, value):
+        for item in value.values():
+            if type(item) in (int, float) and (item < 0 or (type(item) is float and not isfinite(item))):
+                raise ValueError("reasoning metadata numeric values must be finite and non-negative")
         return deep_freeze(value)
 
     @model_validator(mode="after")

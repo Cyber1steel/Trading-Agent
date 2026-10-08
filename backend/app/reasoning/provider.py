@@ -12,6 +12,7 @@ class ProviderReply:
     model_id: str
     raw_response: str
     request_metadata: tuple[tuple[str, str | int | bool | None], ...] = ()
+    telemetry: tuple[tuple[str, int | float | str | bool | None], ...] = ()
 
 
 class ReasoningProvider(Protocol):
