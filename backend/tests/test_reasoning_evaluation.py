@@ -282,7 +282,7 @@ def test_provider_response_size_limit_fails_closed():
     from app.reasoning.service import ReasoningService
     result = ReasoningService(FakeProvider(response)).reason(ReasoningRequest(context=context, question="Explain."))
     assert result.status is ReasoningStatus.INSUFFICIENT_EVIDENCE
-    assert result.failure_code == "ProviderError"
+    assert result.failure_code == "ProviderInvalidResponse"
 
 
 @pytest.mark.parametrize("payload", [

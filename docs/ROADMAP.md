@@ -15,6 +15,7 @@ The master engineering specification has been established in [TRADING_AGENT_SPEC
 - [x] Phase 3A — LLM reasoning and evidence orchestration foundation
 - [x] Phase 3B — Reasoning evaluation and adversarial validation foundation
 - [x] Phase 3C — Real LLM provider adapter and opt-in evaluation harness (live model run pending credentials)
+- [x] Phase 3D — Multi-provider reasoning gateway with bounded Groq-first failover (live Groq evaluation pending credentials)
 - [ ] Phase 3 — External market-data integrations and expanded coverage
 - [ ] Phase 4 — Expanded market/technical analysis
 - [ ] Phase 5 — Trading agent

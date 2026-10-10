@@ -16,6 +16,7 @@ from app.reasoning.contracts import (
 )
 from app.reasoning.errors import (
     ProviderError,
+    ProviderInvalidResponse,
     ProviderTimeout,
     ProviderUnavailable,
     ReasoningContextError,
@@ -75,7 +76,7 @@ class ReasoningService:
             if not reply.provider_id or not reply.model_id:
                 raise ProviderUnavailable("provider/model identity is missing")
             if type(reply.raw_response) is not str or len(reply.raw_response) > MAX_PROVIDER_RESPONSE_CHARS:
-                raise ProviderError("provider response is missing or exceeds the configured size limit")
+                raise ProviderInvalidResponse("provider response is missing or exceeds the configured size limit")
             if type(reply.request_metadata) is not tuple or any(
                 type(entry) is not tuple or len(entry) != 2 for entry in reply.request_metadata
             ):
@@ -123,14 +124,22 @@ class ReasoningService:
         except TimeoutError:
             return self._failure(request, "provider_timeout", ProviderTimeout, "not_available", "not_available")
         except (ProviderError, ProviderUnavailable, ProviderTimeout) as exc:
-            return self._failure(request, type(exc).__name__, type(exc), getattr(self.provider, "provider_id", "not_available"), getattr(self.provider, "model_id", "not_available"), reply)
+            return self._failure(
+                request,
+                getattr(exc, "failure_code", type(exc).__name__),
+                type(exc),
+                getattr(exc, "provider_id", getattr(self.provider, "provider_id", "not_available")),
+                getattr(exc, "model_id", getattr(self.provider, "model_id", "not_available")),
+                reply,
+                getattr(exc, "telemetry", ()),
+            )
         except (ValidationError, ValueError, json.JSONDecodeError, ReasoningValidationError):
             return self._failure(request, "invalid_provider_response", ReasoningValidationError, getattr(self.provider, "provider_id", "unknown"), getattr(self.provider, "model_id", "unknown"), reply)
         except Exception:
             # Adapter-specific failures never turn into a guess or a trading recommendation.
             return self._failure(request, "provider_failure", ProviderError, getattr(self.provider, "provider_id", "unknown"), getattr(self.provider, "model_id", "unknown"), reply)
 
-    def _failure(self, request, code, _error_type, provider_id, model_id, reply=None):
+    def _failure(self, request, code, _error_type, provider_id, model_id, reply=None, telemetry=()):
         return self._result(
             request,
             status=ReasoningStatus.INSUFFICIENT_EVIDENCE,
@@ -140,6 +149,7 @@ class ReasoningService:
             provider_id=provider_id,
             model_id=model_id,
             provider_response_sha256=self._response_hash(reply),
+            telemetry=dict(telemetry),
             failure_code=code,
         )
 

@@ -8,6 +8,8 @@ from app.reasoning.contracts import (
     ReasoningStatus,
 )
 from app.reasoning.service import ReasoningService
+from app.reasoning.gateway import ReasoningProviderGateway
+from app.reasoning.provider import ProviderAvailability, ProviderCapabilities, ProviderReply, ReasoningProvider
 
 __all__ = [
     "EvidenceTier",
@@ -16,4 +18,9 @@ __all__ = [
     "ReasoningResult",
     "ReasoningService",
     "ReasoningStatus",
+    "ReasoningProvider",
+    "ReasoningProviderGateway",
+    "ProviderAvailability",
+    "ProviderCapabilities",
+    "ProviderReply",
 ]

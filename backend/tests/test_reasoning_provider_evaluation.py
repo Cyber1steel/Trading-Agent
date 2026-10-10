@@ -22,20 +22,23 @@ def test_live_runner_skips_without_credentials_even_when_cost_flag_is_set(monkey
     monkeypatch.setattr(
         evaluate_reasoning_provider,
         "get_settings",
-        lambda: Settings(_env_file=None, openai_api_key=None),
+        lambda: Settings(_env_file=None, groq_api_key=None, openai_api_key=SecretStr("openai-only")),
     )
-    assert evaluate_reasoning_provider.main(["--confirm-live-cost"]) == 0
-    assert "SKIPPED" in capsys.readouterr().out
+    assert evaluate_reasoning_provider.main(["--provider", "groq", "--confirm-live-cost"]) == 0
+    output = capsys.readouterr().out
+    assert "SKIPPED" in output
+    assert "GROQ_API_KEY" in output
+    assert "openai-only" not in output
 
 
 def test_live_runner_requires_explicit_cost_confirmation_with_credentials(monkeypatch):
     monkeypatch.setattr(
         evaluate_reasoning_provider,
         "get_settings",
-        lambda: Settings(_env_file=None, openai_api_key=SecretStr("test-only")),
+        lambda: Settings(_env_file=None, groq_api_key=SecretStr("test-only")),
     )
     try:
-        evaluate_reasoning_provider.main([])
+        evaluate_reasoning_provider.main(["--provider", "groq"])
     except SystemExit as exc:
         assert exc.code == 2
     else:

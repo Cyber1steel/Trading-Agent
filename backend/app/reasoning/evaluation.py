@@ -12,7 +12,13 @@ from pydantic import Field, model_validator
 from app.market_data.contracts import MarketDataModel
 from app.reasoning.contracts import ReasoningRequest, ReasoningStatus
 from app.reasoning.errors import ProviderUnavailable, ProviderTimeout, ReasoningContextError
-from app.reasoning.provider import ProviderReply
+from app.reasoning.fingerprints import PROMPT_CONTRACT_VERSION
+from app.reasoning.gateway import ReasoningProviderGateway
+from app.reasoning.provider import (
+    ProviderAvailability,
+    ProviderCapabilities,
+    ProviderReply,
+)
 from app.reasoning.service import ReasoningService
 
 
@@ -121,6 +127,19 @@ class SimulatedProvider:
         self.calls = 0
         self.last_prompt = None
 
+    @property
+    def capabilities(self):
+        return ProviderCapabilities(
+            provider_id=self.provider_id,
+            model_id=self.model_id,
+            structured_output=True,
+            max_input_bytes=1048576,
+            max_output_tokens=8192,
+            streaming=False,
+            supported_contract_versions=(PROMPT_CONTRACT_VERSION,),
+            availability=ProviderAvailability.AVAILABLE,
+        )
+
     def generate(self, prompt):
         self.calls += 1
         self.last_prompt = prompt
@@ -141,8 +160,11 @@ class SimulatedProvider:
 def run_scenario(scenario: EvaluationScenario) -> ScenarioResult:
     """Execute one scenario through the production reasoning service."""
     provider = SimulatedProvider(scenario.provider_response, scenario.provider_failure)
+    gateway = ReasoningProviderGateway(
+        {provider.provider_id: provider}, (provider.provider_id,),
+    )
     try:
-        result = ReasoningService(provider).reason(scenario.request)
+        result = ReasoningService(gateway).reason(scenario.request)
     except ReasoningContextError as exc:
         return ScenarioResult(
             scenario_id=scenario.scenario_id,

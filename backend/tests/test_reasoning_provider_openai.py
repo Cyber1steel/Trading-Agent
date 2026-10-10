@@ -6,8 +6,9 @@ import pytest
 from pydantic import SecretStr, ValidationError
 
 from app.core.config import Settings
-from app.reasoning.errors import ProviderAuthenticationError, ProviderRateLimited, ProviderTimeout, ProviderUnavailable
+from app.reasoning.errors import ProviderAuthenticationError, ProviderRateLimited, ProviderTimeout
 from app.reasoning.factory import create_reasoning_provider
+from app.reasoning.gateway import ReasoningProviderGateway
 from app.reasoning.providers.openai import OpenAIReasoningProvider
 
 
@@ -16,15 +17,19 @@ def _settings(**kwargs):
 
 
 def _prompt():
-    return SimpleNamespace(system_instructions="instructions", context_json="{}", question="question")
+    return SimpleNamespace(
+        system_instructions="instructions", context_json="{}", question="question",
+        output_schema_json="{}", contract_version="3a-prompt.1.0",
+        deterministic_payload=lambda: "canonical prompt",
+    )
 
 
-def test_provider_factory_and_import_do_not_require_credentials_or_construct_sdk():
-    provider = create_reasoning_provider(_settings(openai_api_key=None))
-    assert isinstance(provider, OpenAIReasoningProvider)
-    assert provider._client is None
-    with pytest.raises(ProviderUnavailable):
-        provider.generate(_prompt())
+def test_provider_factory_and_import_do_not_require_credentials_or_construct_sdks():
+    gateway = create_reasoning_provider(_settings(openai_api_key=None, groq_api_key=None))
+    assert isinstance(gateway, ReasoningProviderGateway)
+    assert isinstance(gateway._providers["openai"], OpenAIReasoningProvider)
+    assert gateway._providers["openai"]._client is None
+    assert gateway._providers["groq"]._client is None
 
 
 def test_provider_sends_existing_contract_with_bounds_and_returns_only_safe_metadata():
@@ -41,11 +46,12 @@ def test_provider_sends_existing_contract_with_bounds_and_returns_only_safe_meta
 
     responses = Responses()
     provider = OpenAIReasoningProvider(
-        _settings(openai_api_key=SecretStr("secret-test"), reasoning_max_retries=1),
+        _settings(openai_api_key=SecretStr("secret-test")),
         client=SimpleNamespace(responses=responses),
     )
     prompt = SimpleNamespace(
         system_instructions="instructions", context_json='{"trusted":"as data"}', question="question",
+        output_schema_json="{}", deterministic_payload=lambda: "canonical prompt",
     )
     reply = provider.generate(prompt)
     assert responses.kwargs["model"] == "gpt-6.1-sol"
@@ -61,6 +67,19 @@ def test_provider_sends_existing_contract_with_bounds_and_returns_only_safe_meta
     assert telemetry["total_tokens"] == 17
     assert type(telemetry["latency_ms"]) is int and telemetry["latency_ms"] >= 0
     assert "secret-test" not in repr(reply)
+
+
+def test_openai_sdk_retry_is_disabled_for_gateway_owned_failover(monkeypatch):
+    import openai
+
+    captured = {}
+    monkeypatch.setattr(openai, "OpenAI", lambda **kwargs: captured.update(kwargs) or object())
+    provider = OpenAIReasoningProvider(_settings(openai_api_key=SecretStr("test-only")))
+
+    provider._get_client()
+
+    assert captured["max_retries"] == 0
+    assert captured["timeout"] == 30
 
 
 @pytest.mark.parametrize("exc,expected", [
@@ -84,7 +103,9 @@ def test_provider_configuration_is_bounded_and_base_url_must_be_safe():
     with pytest.raises(ValidationError):
         _settings(reasoning_timeout_seconds=0)
     with pytest.raises(ValidationError):
-        _settings(reasoning_max_retries=3)
+        _settings(reasoning_provider_order="groq,groq")
+    with pytest.raises(ValidationError):
+        _settings(reasoning_provider_order="groq,openai,unknown")
     with pytest.raises(ValidationError):
         _settings(reasoning_max_input_bytes=0)
     with pytest.raises(ValidationError):
@@ -102,6 +123,7 @@ def test_oversized_prompt_is_rejected_before_client_initialization():
     with pytest.raises(ProviderContextTooLarge, match="configured input limit"):
         provider.generate(SimpleNamespace(
             system_instructions="instructions", context_json="x" * 1100, question="question",
+            output_schema_json="{}", deterministic_payload=lambda: "x" * 1100,
         ))
     assert provider._client is None
 
